@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+    
+    - name: Build
+      run: forge build
+    
+    - name: Format check
+      run: forge fmt --check
+    
+    - name: Test
+      run: forge test -vv
+    
+    - name: Snapshot
+      run: forge snapshot --check
