@@ -103,7 +103,28 @@ Emitted for indexing and UI:
 - `MilestonesCreated`, `MilestoneEvidenceSubmitted`, `MilestoneApproved`
 - `PayoutReleased`
 
+## Contributing
+
+We welcome contributions through GrantFox! See [CONTRIBUTING.md](CONTRIBUTING.md) for details on:
+- How to claim issues via GrantFox
+- Development setup and testing
+- Pull request process
+- Code style guidelines
+
+## GrantFox
+
+This repository is part of the Adamantine Guild project and participates in GrantFox for open-source collaboration. Contributors can:
+- Browse and claim issues via [GrantFox Contributor App](https://contribute.grantfox.xyz/)
+- Follow contribution guidelines in [CONTRIBUTING.md](CONTRIBUTING.md)
+- Track PR reviews and campaign participation
+
+Maintainers manage campaigns and review contributions via the [GrantFox Maintainer App](https://maintainer.grantfox.xyz/).
+
 ## License
 
-MIT
+MIT - see [LICENSE](LICENSE) file for details.
+
+## Security
+
+For security concerns, please see [SECURITY.md](SECURITY.md).
 
