@@ -4,6 +4,8 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, token, Address, Env, String, Vec
 };
 
+mod storage_layout;
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AppStatus {
@@ -30,6 +32,10 @@ pub struct Milestone {
     pub paid: bool,
 }
 
+/// `#[contracttype]` encodes each unit variant as its name, stored as a
+/// Symbol -- not by declaration order -- so reordering these is harmless.
+/// Renaming or removing a variant is not: see `storage_layout`'s test,
+/// which pins the current encoding of every variant.
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
