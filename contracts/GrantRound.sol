@@ -20,6 +20,9 @@ contract GrantRound {
     /// @dev Basic reentrancy guard for payout
     bool private _locked;
 
+    /// @dev Emergency stop switch (#1). When set, fund-in operations revert.
+    bool public paused;
+
     modifier onlyAdmin() {
         require(msg.sender == admin, "Not admin");
         _;
@@ -30,6 +33,11 @@ contract GrantRound {
         _locked = true;
         _;
         _locked = false;
+    }
+
+    modifier whenNotPaused() {
+        require(!paused, "paused");
+        _;
     }
 
     enum AppStatus {
@@ -76,6 +84,11 @@ contract GrantRound {
     event MilestoneApproved(uint256 indexed appId, uint256 indexed index, address indexed admin);
     /// @dev Emitted when payout released to grantee
     event PayoutReleased(uint256 indexed appId, uint256 indexed index, address to, uint256 amount);
+    /// @dev Emitted when unspent funds are withdrawn by admin (#5)
+    event FundsClawedBack(address indexed to, uint256 amount);
+    /// @dev Emitted when the round is paused/unpaused (#1)
+    event Paused(address indexed admin);
+    event Unpaused(address indexed admin);
 
     /// @param _title round title
     /// @param _metadataURI metadata URI for the round
@@ -95,8 +108,22 @@ contract GrantRound {
     }
 
     /// @notice Deposit ETH explicitly
-    function deposit() external payable onlyAdmin {
+    function deposit() external payable onlyAdmin whenNotPaused {
         emit DepositReceived(msg.sender, msg.value);
+    }
+
+    /// @notice Emergency stop: halts deposit() until unpaused (#1)
+    function pause() external onlyAdmin {
+        require(!paused, "already paused");
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    /// @notice Resume deposit() after a pause (#1)
+    function unpause() external onlyAdmin {
+        require(paused, "not paused");
+        paused = false;
+        emit Unpaused(msg.sender);
     }
 
     /// @notice Submit a grant application by metadata URI
@@ -212,6 +239,7 @@ contract GrantRound {
         uint256 amt = address(this).balance;
         (bool ok,) = recipient.call{value: amt}("");
         require(ok, "clawback failed");
+        emit FundsClawedBack(recipient, amt);
     }
 }
 
