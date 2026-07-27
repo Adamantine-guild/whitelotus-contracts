@@ -4,6 +4,8 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, token, Address, Env, String, Vec
 };
 
+pub mod math;
+
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AppStatus {
