@@ -1,9 +1,54 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, token, Address, Env, String, Vec
+    contract, contracterror, contractimpl, contracttype, token, Address, Env, String, Vec,
 };
 
+// ─── Custom Errors ──────────────────────────────────────────────────────────
+//
+// Custom errors cost no ledger bytes on revert — the EVM/Wasm runtime encodes
+// only the 4-byte (u32) discriminant instead of an arbitrary string. This
+// mirrors the Solidity custom-error pattern for gas/resource savings.
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum Error {
+    /// `initialize` called on an already-initialized contract.
+    AlreadyInitialized = 1,
+    /// The application URI string was empty.
+    EmptyUri = 2,
+    /// The application does not exist in storage.
+    ApplicationNotFound = 3,
+    /// The application is not in the expected `Pending` status.
+    NotPending = 4,
+    /// The application is not in `Approved` status.
+    NotApproved = 5,
+    /// Milestones have already been created for this application.
+    MilestonesAlreadySet = 6,
+    /// The milestones list was empty.
+    NoMilestones = 7,
+    /// A milestone amount must be greater than zero.
+    ZeroAmount = 8,
+    /// The milestone set does not exist in storage.
+    MilestonesNotFound = 9,
+    /// The milestone index is out of range.
+    BadIndex = 10,
+    /// Evidence has already been submitted for this milestone.
+    AlreadySubmitted = 11,
+    /// The evidence URI string was empty.
+    EmptyEvidence = 12,
+    /// The milestone has not yet been submitted by the grantee.
+    NotSubmitted = 13,
+    /// The milestone has already been approved.
+    AlreadyApproved = 14,
+    /// The milestone has not been approved yet.
+    NotApprovedMilestone = 15,
+    /// The milestone payout has already been made.
+    AlreadyPaid = 16,
+}
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 mod governance;
 mod storage_layout;
 /// Lifecycle state of an [`Application`].
@@ -76,6 +121,8 @@ pub enum DataKey {
     Milestones(u32),
 }
 
+// ─── Contract ────────────────────────────────────────────────────────────────
+
 #[contract]
 pub struct GrantRoundContract;
 
@@ -97,10 +144,9 @@ impl GrantRoundContract {
         budget: i128,
         token: Address,
     ) {
-        assert!(
-            !env.storage().instance().has(&DataKey::Admin),
-            "Already initialized"
-        );
+        if env.storage().instance().has(&DataKey::Admin) {
+            env.panic_with_error(Error::AlreadyInitialized);
+        }
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage().instance().set(&DataKey::Title, &title);
         env.storage().instance().set(&DataKey::MetadataURI, &metadata_uri);
@@ -116,7 +162,9 @@ impl GrantRoundContract {
     /// Panics if `uri` is empty.
     pub fn submit_application(env: Env, applicant: Address, uri: String) -> u32 {
         applicant.require_auth();
-        assert!(uri.len() > 0, "uri empty");
+        if uri.len() == 0 {
+            env.panic_with_error(Error::EmptyUri);
+        }
 
         let mut app_count: u32 = env.storage().instance().get(&DataKey::AppCount).unwrap();
         app_count += 1;
@@ -144,9 +192,11 @@ impl GrantRoundContract {
             .storage()
             .persistent()
             .get(&DataKey::Application(app_id))
-            .expect("app !exists");
+            .unwrap_or_else(|| env.panic_with_error(Error::ApplicationNotFound));
 
-        assert!(app.status == AppStatus::Pending, "not pending");
+        if app.status != AppStatus::Pending {
+            env.panic_with_error(Error::NotPending);
+        }
         app.status = AppStatus::Approved;
         env.storage().persistent().set(&DataKey::Application(app_id), &app);
     }
@@ -162,9 +212,11 @@ impl GrantRoundContract {
             .storage()
             .persistent()
             .get(&DataKey::Application(app_id))
-            .expect("app !exists");
+            .unwrap_or_else(|| env.panic_with_error(Error::ApplicationNotFound));
 
-        assert!(app.status == AppStatus::Pending, "not pending");
+        if app.status != AppStatus::Pending {
+            env.panic_with_error(Error::NotPending);
+        }
         app.status = AppStatus::Rejected;
         env.storage().persistent().set(&DataKey::Application(app_id), &app);
     }
@@ -183,15 +235,23 @@ impl GrantRoundContract {
             .storage()
             .persistent()
             .get(&DataKey::Application(app_id))
-            .expect("app !exists");
+            .unwrap_or_else(|| env.panic_with_error(Error::ApplicationNotFound));
 
-        assert!(app.status == AppStatus::Approved, "app !approved");
-        assert!(!env.storage().persistent().has(&DataKey::Milestones(app_id)), "already set");
-        assert!(amounts.len() > 0, "no milestones");
+        if app.status != AppStatus::Approved {
+            env.panic_with_error(Error::NotApproved);
+        }
+        if env.storage().persistent().has(&DataKey::Milestones(app_id)) {
+            env.panic_with_error(Error::MilestonesAlreadySet);
+        }
+        if amounts.len() == 0 {
+            env.panic_with_error(Error::NoMilestones);
+        }
 
         let mut milestones = Vec::new(&env);
         for amount in amounts.iter() {
-            assert!(amount > 0, "amount 0");
+            if amount <= 0 {
+                env.panic_with_error(Error::ZeroAmount);
+            }
             milestones.push_back(Milestone {
                 amount,
                 evidence_uri: String::from_str(&env, ""),
@@ -214,21 +274,30 @@ impl GrantRoundContract {
             .storage()
             .persistent()
             .get(&DataKey::Application(app_id))
-            .expect("app !exists");
+            .unwrap_or_else(|| env.panic_with_error(Error::ApplicationNotFound));
 
         app.applicant.require_auth();
-        assert!(app.status == AppStatus::Approved, "app !approved");
+
+        if app.status != AppStatus::Approved {
+            env.panic_with_error(Error::NotApproved);
+        }
 
         let mut milestones: Vec<Milestone> = env
             .storage()
             .persistent()
             .get(&DataKey::Milestones(app_id))
-            .expect("milestones !exist");
+            .unwrap_or_else(|| env.panic_with_error(Error::MilestonesNotFound));
 
-        assert!(index < milestones.len(), "bad index");
+        if index >= milestones.len() {
+            env.panic_with_error(Error::BadIndex);
+        }
         let mut m = milestones.get(index).unwrap();
-        assert!(!m.submitted, "already submitted");
-        assert!(evidence_uri.len() > 0, "evidence empty");
+        if m.submitted {
+            env.panic_with_error(Error::AlreadySubmitted);
+        }
+        if evidence_uri.len() == 0 {
+            env.panic_with_error(Error::EmptyEvidence);
+        }
 
         m.evidence_uri = evidence_uri;
         m.submitted = true;
@@ -249,12 +318,18 @@ impl GrantRoundContract {
             .storage()
             .persistent()
             .get(&DataKey::Milestones(app_id))
-            .expect("milestones !exist");
+            .unwrap_or_else(|| env.panic_with_error(Error::MilestonesNotFound));
 
-        assert!(index < milestones.len(), "bad index");
+        if index >= milestones.len() {
+            env.panic_with_error(Error::BadIndex);
+        }
         let mut m = milestones.get(index).unwrap();
-        assert!(m.submitted, "not submitted");
-        assert!(!m.approved, "already approved");
+        if !m.submitted {
+            env.panic_with_error(Error::NotSubmitted);
+        }
+        if m.approved {
+            env.panic_with_error(Error::AlreadyApproved);
+        }
 
         m.approved = true;
         milestones.set(index, m);
@@ -273,18 +348,24 @@ impl GrantRoundContract {
             .storage()
             .persistent()
             .get(&DataKey::Application(app_id))
-            .expect("app !exists");
+            .unwrap_or_else(|| env.panic_with_error(Error::ApplicationNotFound));
 
         let mut milestones: Vec<Milestone> = env
             .storage()
             .persistent()
             .get(&DataKey::Milestones(app_id))
-            .expect("milestones !exist");
+            .unwrap_or_else(|| env.panic_with_error(Error::MilestonesNotFound));
 
-        assert!(index < milestones.len(), "bad index");
+        if index >= milestones.len() {
+            env.panic_with_error(Error::BadIndex);
+        }
         let mut m = milestones.get(index).unwrap();
-        assert!(m.approved, "!approved");
-        assert!(!m.paid, "paid");
+        if !m.approved {
+            env.panic_with_error(Error::NotApprovedMilestone);
+        }
+        if m.paid {
+            env.panic_with_error(Error::AlreadyPaid);
+        }
 
         m.paid = true;
         let amount = m.amount;
