@@ -1,130 +1,86 @@
-# WhiteLotus MVP Contracts
+<div align="center">
+  <h1>WhiteLotus Contracts</h1>
+  <p>
+    <strong>Robust and efficient smart contracts powering the WhiteLotus grant lifecycle.</strong>
+  </p>
+  
+  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+  [![Stellar](https://img.shields.io/badge/Network-Stellar-black)](https://stellar.org/)
+  [![Soroban](https://img.shields.io/badge/Platform-Soroban-purple)](https://soroban.stellar.org/)
+  [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+</div>
 
-Minimal, readable smart contracts demonstrating the basic lifecycle of a grant from application approval through milestone payout. This is an intentionally constrained MVP, designed for clarity and future extensibility rather than completeness.
+## 🌟 Overview
 
-## Implemented
+WhiteLotus Contracts are engineered on Stellar's Soroban platform using Rust. These smart contracts manage the end-to-end lifecycle of a grant—from application approval through milestone validation and final payouts.
 
-- Create simple grant rounds via a factory
-- Store round config (title, metadata URI, budget, admin)
-- Submit applications with metadata URIs
-- Admin approval/rejection of applications
-- Define fixed milestone amounts per approved application
-- Grantee submits milestone evidence by URI
-- Admin approves milestones
-- ETH escrow held by the round; release payout for approved milestones
-- Clean events for indexing and UI
+Designed with clarity, security, and future extensibility in mind, these contracts serve as the foundation of the WhiteLotus ecosystem.
 
-## Explicitly Omitted (MVP)
+## ✨ Features
 
-- Token-weighted governance and delegated voting
-- Snapshot or off-chain governance integration
-- Advanced committee/role hierarchies
-- Conflict-of-interest enforcement
-- Reputation scoring
-- Advanced treasury operations and multi-token routing
-- Upgradeability (single, non-upgradeable contracts)
-- Sophisticated clawback mechanisms (basic admin withdrawal only)
-- Elaborate plugin/modular systems
+- **Grant Rounds**: Initialize rounds with comprehensive configurations (title, metadata URI, budget, and administrator).
+- **Application Management**: Secure submission of applications via metadata URIs, complete with administrative approval/rejection workflows.
+- **Milestone Tracking**: Define fixed milestone tranches for approved applications.
+- **Evidence Verification**: Grantees can seamlessly submit evidence URIs for their milestones.
+- **Native Payouts**: Secure release of payouts using Soroban's standard Token interface following milestone approval.
+- **Events**: Clean and structured contract events designed for easy off-chain indexing and UI integration.
 
-## Contracts
+## 🛠️ Getting Started
 
-- `GrantRoundFactory`: Deploys `GrantRound` instances and emits `RoundCreated`.
-- `GrantRound`: Holds round config, application approvals, milestone tracking, evidence submission, and ETH payouts.
+### Prerequisites
 
-Notes and assumptions:
+- [Rust](https://www.rust-lang.org/tools/install) installed.
+- [Soroban CLI](https://soroban.stellar.org/docs/getting-started/setup) installed.
 
-- Single `admin` per round with simple access control.
-- Budget is declarative for UI; payouts only check actual ETH balance.
-- Metadata and evidence are referenced by URIs; large content stays off-chain.
-- Reentrancy protection is a minimal mutex around payouts.
-- TODOs in code mark extension points for governance/permissions and clawbacks.
+### Build and Test
 
-## Getting Started
-
-Prerequisites:
-
-- Foundry installed: https://book.getfoundry.sh/getting-started/installation
-
-Install dependencies and build:
+Install dependencies and build the WebAssembly target:
 
 ```bash
-forge install foundry-rs/forge-std
-forge build
+cargo build --target wasm32-unknown-unknown --release
 ```
 
-Run tests:
+Execute the test suite to verify the logic:
 
 ```bash
-forge test -vv
+cargo test
 ```
 
-## Key Flows
+## 🔄 Key Workflows
 
-1. Admin deploys `GrantRound` via the factory.
-2. Admin funds the round with ETH (`deposit()` or send to contract).
-3. Applicant submits application with a metadata URI.
-4. Admin approves the application.
-5. Admin defines milestones with fixed amounts.
-6. Grantee submits evidence URI for a milestone.
-7. Admin approves the milestone.
-8. Admin releases the milestone payout (ETH) to the grantee.
+1. **Initialization**: Admin deploys the contract and configures the round.
+2. **Funding**: The round is funded via standard Stellar asset transfers to the contract address.
+3. **Application**: Applicants submit proposals using off-chain metadata URIs.
+4. **Approval**: Admin reviews and approves the application.
+5. **Milestone Creation**: Admin establishes milestones and their respective payout amounts.
+6. **Evidence Submission**: Grantee submits proof of work for a milestone.
+7. **Verification**: Admin reviews and approves the submitted evidence.
+8. **Payout**: Admin triggers the release of the milestone payout to the grantee.
 
-## Deployment
+## 🤝 Contributing
 
-Example script: `script/Deploy.s.sol`
+We strongly believe in open-source and welcome contributions from the community!
 
-```bash
-export PRIVATE_KEY=<hex_private_key>
-export ADMIN_ADDRESS=<admin_eth_address> # optional; defaults to deployer
-forge script script/Deploy.s.sol --rpc-url <RPC_URL> --broadcast
-```
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/amazing-feature`).
+3. Commit your changes (`git commit -m 'Add some amazing feature'`).
+4. Push to the branch (`git push origin feature/amazing-feature`).
+5. Open a Pull Request.
 
-## Where to Extend
+Please review our [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-- Governance/permissions: Replace single-admin with roles or external governance adapters.
-- Treasury: Support ERC20 tokens and richer accounting/reservations.
-- Clawbacks: Add timeouts, dispute windows, and partial clawbacks.
-- Evidence and evaluation: Integrate richer state machines and committees.
-- Round lifecycle: Add statuses (scheduled, active, finalized) and constraints.
+### GrantFox Platform
 
-## Security Notes
-
-- Payouts are protected against reentrancy with a simple mutex.
-- Admin functions gate sensitive actions; review carefully when extending.
-- Never store secrets on-chain; keep large data in content-addressed storage.
-
-## Events
-
-Emitted for indexing and UI:
-
-- `RoundCreated`
-- `DepositReceived`
-- `ApplicationSubmitted`, `ApplicationApproved`, `ApplicationRejected`
-- `MilestonesCreated`, `MilestoneEvidenceSubmitted`, `MilestoneApproved`
-- `PayoutReleased`
-
-## Contributing
-
-We welcome contributions through GrantFox! See [CONTRIBUTING.md](CONTRIBUTING.md) for details on:
-- How to claim issues via GrantFox
-- Development setup and testing
-- Pull request process
-- Code style guidelines
-
-## GrantFox
-
-This repository is part of the Adamantine Guild project and participates in GrantFox for open-source collaboration. Contributors can:
-- Browse and claim issues via [GrantFox Contributor App](https://contribute.grantfox.xyz/)
-- Follow contribution guidelines in [CONTRIBUTING.md](CONTRIBUTING.md)
-- Track PR reviews and campaign participation
+This repository participates in **GrantFox** for open-source collaboration. Contributors can:
+- Browse and claim issues via the [GrantFox Contributor App](https://contribute.grantfox.xyz/)
+- Track PR reviews and campaign participation.
 
 Maintainers manage campaigns and review contributions via the [GrantFox Maintainer App](https://maintainer.grantfox.xyz/).
 
-## License
+## 🛡️ Security
 
-MIT - see [LICENSE](LICENSE) file for details.
+For security policies and vulnerability reporting, please refer to [SECURITY.md](SECURITY.md).
 
-## Security
+## 📄 License
 
-For security concerns, please see [SECURITY.md](SECURITY.md).
-
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
