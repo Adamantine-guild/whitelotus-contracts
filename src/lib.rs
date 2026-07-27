@@ -5,6 +5,7 @@ use soroban_sdk::{
 };
 
 pub mod math;
+pub mod zk;
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -241,6 +242,19 @@ impl GrantRoundContract {
         if balance > 0 {
             token_client.transfer(&env.current_contract_address(), &to, &balance);
         }
+    }
+
+    /// Verifies a Groth16 proof against `vk` and `public_inputs` using the
+    /// host's native BLS12-381 pairing check. Panics on an invalid proof;
+    /// returns `true` on a valid one.
+    pub fn verify_zk_proof(
+        env: Env,
+        vk: zk::VerifyingKey,
+        proof: zk::Groth16Proof,
+        public_inputs: Vec<soroban_sdk::crypto::bls12_381::Fr>,
+    ) -> bool {
+        zk::require_valid_groth16(&env, &vk, &proof, &public_inputs);
+        true
     }
 }
 
