@@ -47,12 +47,11 @@ pub struct Milestone {
 
 /// Storage keys for the contract's instance and persistent storage.
 ///
-/// The XDR discriminant for each variant is derived from its position in
-/// this enum, and that discriminant is what storage entries are keyed on
-/// under the hood. Only ever append new variants to the end -- reordering,
-/// removing, or inserting a variant in the middle changes the discriminants
-/// of everything after it, which makes every existing storage entry keyed
-/// under those variants unreadable after an upgrade.
+/// `#[contracttype]` encodes each unit variant as its name, stored as a
+/// Symbol -- not by declaration order -- so reordering these is harmless.
+/// Renaming or removing a variant is not: any storage entry already keyed
+/// under the old name becomes unreachable after an upgrade, since nothing
+/// will construct that `DataKey` again to look it up.
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
