@@ -4,6 +4,7 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, token, Address, Env, String, Vec
 };
 
+mod storage_layout;
 /// Lifecycle state of an [`Application`].
 pub mod math;
 pub mod zk;
@@ -48,6 +49,10 @@ pub struct Milestone {
     pub paid: bool,
 }
 
+/// `#[contracttype]` encodes each unit variant as its name, stored as a
+/// Symbol -- not by declaration order -- so reordering these is harmless.
+/// Renaming or removing a variant is not: see `storage_layout`'s test,
+/// which pins the current encoding of every variant.
 /// Storage keys for the contract's instance and persistent storage.
 ///
 /// `#[contracttype]` encodes each unit variant as its name, stored as a
