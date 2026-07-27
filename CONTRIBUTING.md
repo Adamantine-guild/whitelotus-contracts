@@ -18,18 +18,27 @@ This repository participates in GrantFox for open-source collaboration. Here's h
 
 ### Prerequisites
 
-- Foundry installed: https://book.getfoundry.sh/getting-started/installation
+- [Foundry](https://book.getfoundry.sh/getting-started/installation) for EVM reference contracts and Forge tests
+- [Rust](https://www.rust-lang.org/tools/install) and the Soroban CLI for Stellar smart contracts
 - Git
 
 ### Installation
 
 ```bash
-git clone https://github.com/your-org/whitelotus-contracts.git
+git clone https://github.com/Adamantine-guild/whitelotus-contracts.git
 cd whitelotus-contracts
-forge install foundry-rs/forge-std
+forge install foundry-rs/forge-std --no-git
 ```
 
 ### Building
+
+Soroban contracts (primary):
+
+```bash
+cargo build --target wasm32-unknown-unknown --release
+```
+
+EVM reference contracts:
 
 ```bash
 forge build
@@ -37,8 +46,16 @@ forge build
 
 ### Testing
 
+Fast Forge unit tests for core EVM reference contracts:
+
 ```bash
 forge test -vv
+```
+
+Soroban integration tests:
+
+```bash
+cargo test
 ```
 
 ### Formatting
