@@ -4,6 +4,7 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, token, Address, Env, String, Vec
 };
 
+mod governance;
 mod storage_layout;
 /// Lifecycle state of an [`Application`].
 pub mod math;
@@ -300,6 +301,29 @@ impl GrantRoundContract {
     /// been created yet.
     pub fn get_milestones(env: Env, app_id: u32) -> Vec<Milestone> {
         env.storage().persistent().get(&DataKey::Milestones(app_id)).unwrap_or(Vec::new(&env))
+    }
+
+    /// Sets `account`'s voting-power balance, admin-gated the same way the
+    /// rest of this contract's writes are. See `governance` for how this
+    /// interacts with proposal snapshots.
+    pub fn set_voting_balance(env: Env, account: Address, balance: i128) {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        admin.require_auth();
+        governance::set_balance(&env, &account, balance);
+    }
+
+    pub fn get_votes(env: Env, account: Address, ledger_sequence: u32) -> i128 {
+        governance::get_votes(&env, &account, ledger_sequence)
+    }
+
+    pub fn create_voting_proposal(env: Env) -> u32 {
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        admin.require_auth();
+        governance::create_proposal(&env)
+    }
+
+    pub fn get_votes_for_proposal(env: Env, account: Address, proposal_id: u32) -> i128 {
+        governance::get_votes_for_proposal(&env, &account, proposal_id)
     }
 
     /// Sweeps the contract's entire remaining token balance to `to`.
