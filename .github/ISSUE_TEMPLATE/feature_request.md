@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest a new feature for GrantChain Contracts
+about: Suggest a new feature for WhiteLotus Contracts
 title: '[FEATURE] '
 labels: feature, enhancement
 assignees: ''

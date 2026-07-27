@@ -1,4 +1,4 @@
-# GrantChain MVP Contracts
+# WhiteLotus MVP Contracts
 
 Minimal, readable smart contracts demonstrating the basic lifecycle of a grant from application approval through milestone payout. This is an intentionally constrained MVP, designed for clarity and future extensibility rather than completeness.
 

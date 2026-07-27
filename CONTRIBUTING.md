@@ -1,6 +1,6 @@
-# Contributing to GrantChain Contracts
+# Contributing to WhiteLotus Contracts
 
-Thank you for your interest in contributing to GrantChain Contracts! This document guides you through the contribution process.
+Thank you for your interest in contributing to WhiteLotus Contracts! This document guides you through the contribution process.
 
 ## GrantFox Contribution Workflow
 

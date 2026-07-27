@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a bug in GrantChain Contracts
+about: Report a bug in WhiteLotus Contracts
 title: '[BUG] '
 labels: bug
 assignees: ''

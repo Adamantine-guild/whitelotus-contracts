@@ -1,6 +1,6 @@
 ---
 name: Documentation improvement
-about: Suggest improvements to GrantChain Contracts documentation
+about: Suggest improvements to WhiteLotus Contracts documentation
 title: '[DOCS] '
 labels: documentation
 assignees: ''

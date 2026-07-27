@@ -2,7 +2,7 @@
 
 ## Reporting Security Vulnerabilities
 
-If you discover a security vulnerability in GrantChain Contracts, please report it responsibly.
+If you discover a security vulnerability in WhiteLotus Contracts, please report it responsibly.
 
 ### How to Report
 
@@ -32,7 +32,7 @@ Include the following information:
 
 ## Security Best Practices
 
-When developing or deploying GrantChain Contracts:
+When developing or deploying WhiteLotus Contracts:
 
 - Never commit private keys or sensitive credentials
 - Use environment variables for deployment configuration
@@ -72,4 +72,4 @@ This repository contains smart contracts that handle financial transactions. Key
 - **Gas Optimization**: Balance gas efficiency with code clarity
 - **Upgradeability**: Current contracts are non-upgradeable; consider implications
 
-Thank you for helping keep GrantChain Contracts secure!
+Thank you for helping keep WhiteLotus Contracts secure!
