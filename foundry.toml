@@ -13,3 +13,11 @@ line_length = 100
 int_types = "long"
 quote_style = "double"
 number_underscore = "thousands"
+
+[etherscan]
+sepolia = { key = "${ETHERSCAN_API_KEY}", url = "https://api-sepolia.etherscan.io/api" }
+goerli = { key = "${ETHERSCAN_API_KEY}", url = "https://api-goerli.etherscan.io/api" }
+
+[rpc_endpoints]
+sepolia = "${RPC_URL}"
+goerli = "${RPC_URL}"
