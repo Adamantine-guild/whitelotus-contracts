@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {ERC2771Context} from "./ERC2771Context.sol";
+
 /// @title IERC20 - Minimal ERC20 interface for voting-power queries
 interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
@@ -15,7 +17,12 @@ interface IERC20 {
 ///      3. Reveal phase – voters reveal (vote, salt); the hash is verified on-chain.
 ///      4. Tally – anyone finalises the result; committed-but-unrevealed voters are penalised
 ///         (their weight is forfeited entirely and counts for no option).
-contract Governance {
+///
+///      ERC-2771 meta-transaction support: the trusted forwarder can relay commitVote and
+///      revealVote calls on behalf of voters.  `_msgSender()` correctly resolves to the
+///      original signer, so voting power and receipt tracking are tied to the voter, not
+///      the relayer.
+contract Governance is ERC2771Context {
     // ─── Types ──────────────────────────────────────────────────────────────
 
     /// @dev Vote options.  Against defaults to 0, matching the enum's default value.
@@ -77,7 +84,7 @@ contract Governance {
     // ─── Modifiers ──────────────────────────────────────────────────────────
 
     modifier onlyAdmin() {
-        require(msg.sender == admin, "Not admin");
+        require(_msgSender() == admin, "Not admin");
         _;
     }
 
@@ -89,7 +96,8 @@ contract Governance {
     // ─── Constructor ────────────────────────────────────────────────────────
 
     /// @param _votingToken ERC-20 token used to derive each voter's weight via balanceOf()
-    constructor(address _votingToken) {
+    /// @param _trustedForwarder ERC-2771 forwarder address; enables gasless voting via relayers.
+    constructor(address _votingToken, address _trustedForwarder) ERC2771Context(_trustedForwarder) {
         require(_votingToken != address(0), "Zero token");
         admin = msg.sender;
         votingToken = IERC20(_votingToken);
@@ -128,6 +136,7 @@ contract Governance {
     /// @notice Submit a vote commitment hash.
     /// @dev hash must be computed as keccak256(abi.encodePacked(vote, salt)) off-chain.
     ///      The voter's token balance is snapshotted as their weight for this proposal.
+    ///      Can be relayed via the trusted forwarder; `_msgSender()` resolves to the voter.
     /// @param proposalId Target proposal
     /// @param voteHash The commitment hash
     function commitVote(uint256 proposalId, bytes32 voteHash) external validProposal(proposalId) {
@@ -135,22 +144,24 @@ contract Governance {
         require(block.timestamp <= p.commitDeadline, "Commit phase ended");
         require(voteHash != bytes32(0), "Zero hash");
 
-        VoterReceipt storage r = receipts[proposalId][msg.sender];
+        address voter = _msgSender();
+        VoterReceipt storage r = receipts[proposalId][voter];
         require(!r.committed, "Already committed");
 
         r.commitHash = voteHash;
-        r.weight = votingToken.balanceOf(msg.sender);
+        r.weight = votingToken.balanceOf(voter);
         require(r.weight > 0, "No voting power");
         r.committed = true;
 
-        _voterList[proposalId].push(msg.sender);
+        _voterList[proposalId].push(voter);
 
-        emit VoteCommitted(proposalId, msg.sender);
+        emit VoteCommitted(proposalId, voter);
     }
 
     // ─── Phase 2: Reveal ────────────────────────────────────────────────────
 
     /// @notice Reveal your vote and salt; the contract verifies against the stored commitment.
+    /// @dev Can be relayed via the trusted forwarder; `_msgSender()` resolves to the voter.
     /// @param proposalId Target proposal
     /// @param vote The actual vote value
     /// @param salt The random salt used during commit
@@ -162,7 +173,8 @@ contract Governance {
         require(block.timestamp > p.commitDeadline, "Commit phase active");
         require(block.timestamp <= p.revealDeadline, "Reveal phase ended");
 
-        VoterReceipt storage r = receipts[proposalId][msg.sender];
+        address voter = _msgSender();
+        VoterReceipt storage r = receipts[proposalId][voter];
         require(r.committed, "No commitment");
         require(!r.revealed, "Already revealed");
 
@@ -179,7 +191,7 @@ contract Governance {
             p.againstVotes += r.weight;
         }
 
-        emit VoteRevealed(proposalId, msg.sender, vote);
+        emit VoteRevealed(proposalId, voter, vote);
     }
 
     // ─── Phase 3: Tally ─────────────────────────────────────────────────────
