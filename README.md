@@ -40,10 +40,19 @@ Install dependencies and build the WebAssembly target:
 cargo build --target wasm32-unknown-unknown --release
 ```
 
-Execute the test suite to verify the logic:
+Execute the Soroban test suite to verify the logic:
 
 ```bash
 cargo test
+```
+
+### EVM Reference Tests (Foundry)
+
+Solidity reference contracts live in `contracts/` with Forge tests in `test/foundry/`. These provide fast local feedback for core grant lifecycle behavior:
+
+```bash
+forge install foundry-rs/forge-std --no-git
+forge test -vv
 ```
 
 ## 🔄 Key Workflows
