@@ -214,13 +214,14 @@ impl GrantRoundContract {
         assert!(!m.paid, "paid");
 
         m.paid = true;
+        let amount = m.amount;
         milestones.set(index, m);
         env.storage().persistent().set(&DataKey::Milestones(app_id), &milestones);
 
         // Transfer funds
         let token_id: Address = env.storage().instance().get(&DataKey::Token).unwrap();
         let token_client = token::Client::new(&env, &token_id);
-        token_client.transfer(&env.current_contract_address(), &app.applicant, &m.amount);
+        token_client.transfer(&env.current_contract_address(), &app.applicant, &amount);
     }
 
     pub fn get_milestones(env: Env, app_id: u32) -> Vec<Milestone> {
@@ -234,7 +235,7 @@ impl GrantRoundContract {
         let token_id: Address = env.storage().instance().get(&DataKey::Token).unwrap();
         let token_client = token::Client::new(&env, &token_id);
         let balance = token_client.balance(&env.current_contract_address());
-        
+
         if balance > 0 {
             token_client.transfer(&env.current_contract_address(), &to, &balance);
         }
