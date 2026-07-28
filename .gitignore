@@ -9,3 +9,6 @@ lib/
 
 # Environment
 .env
+
+# Local binaries
+/foundry-bin/
