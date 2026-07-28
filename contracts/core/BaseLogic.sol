@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
+/// @title BaseLogic - Base contract for all upgradeable logic contracts
+/// @notice Implements the __gap pattern to prevent storage collisions during upgrades.
+abstract contract BaseLogic is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 import {Initializable} from "openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 
 /// @title BaseLogic - Base contract for all upgradeable logic contracts
@@ -10,6 +17,11 @@ abstract contract BaseLogic is Initializable {
     constructor() {
         _disableInitializers();
     }
+
+    /**
+     * @dev Restricts the upgrade function to the owner of the contract.
+     */
+    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {}
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new

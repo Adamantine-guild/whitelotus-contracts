@@ -3,6 +3,8 @@ pragma solidity ^0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
 import {GrantRoundFactory} from "../contracts/GrantRoundFactory.sol";
+import {StakingLogic} from "../contracts/core/StakingLogic.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MinimalForwarder} from "../contracts/MinimalForwarder.sol";
 
 /// @title Deploy - Unified deployment script for the WhiteLotus grant stack
@@ -65,6 +67,18 @@ contract Deploy is Script {
             console.log("[3/3] No initial round configured (set INIT_ROUND_TITLE to create one)");
         }
 
+        // ── 3. Deploy UUPS StakingLogic Proxy ────────────────────────
+        StakingLogic stakingImpl = new StakingLogic();
+        bytes memory initData = abi.encodeWithSelector(
+            StakingLogic.initialize.selector,
+            admin
+        );
+        ERC1967Proxy stakingProxy = new ERC1967Proxy(
+            address(stakingImpl),
+            initData
+        );
+        console.log("[3/3] StakingLogic Proxy deployed at:", address(stakingProxy));
+
         vm.stopBroadcast();
 
         // ── Summary ──────────────────────────────────────────────────
@@ -72,5 +86,7 @@ contract Deploy is Script {
         console.log("=== Deployment Complete ===");
         console.log("GrantRoundFactory:", address(factory));
         console.log("Total rounds     :", factory.roundsCount());
+        console.log("StakingLogic Proxy:", address(stakingProxy));
     }
 }
+
