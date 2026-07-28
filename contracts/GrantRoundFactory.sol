@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "./GrantRound.sol";
+import {GrantRound} from "./GrantRound.sol";
 
 /// @title GrantRoundFactory - Minimal factory to deploy simple grant rounds
+/// @notice Deploys GrantRound contracts pre-configured with an ERC-2771 trusted forwarder
+///         so that every round created through this factory can participate in
+///         sponsored / gasless meta-transactions out of the box.
 contract GrantRoundFactory {
     event RoundCreated(
         address indexed round,
@@ -14,6 +17,16 @@ contract GrantRoundFactory {
     );
 
     address[] public allRounds;
+
+    /// @dev ERC-2771 forwarder address wired into every deployed GrantRound.
+    address public immutable trustedForwarder;
+
+    /// @param _trustedForwarder Address of the EIP-712 MinimalForwarder (or any ERC-2771
+    ///        compatible forwarder).  Must be non-zero.
+    constructor(address _trustedForwarder) {
+        require(_trustedForwarder != address(0), "Factory: zero forwarder");
+        trustedForwarder = _trustedForwarder;
+    }
 
     /// @notice Create a new grant round with basic config
     /// @param title short title
@@ -28,7 +41,7 @@ contract GrantRoundFactory {
         address admin
     ) external payable returns (address round) {
         address _admin = admin == address(0) ? msg.sender : admin;
-        GrantRound r = new GrantRound(title, metadataURI, budget, _admin);
+        GrantRound r = new GrantRound(title, metadataURI, budget, _admin, trustedForwarder);
         round = address(r);
         allRounds.push(round);
 
