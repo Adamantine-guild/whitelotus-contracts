@@ -1,7 +1,16 @@
-import { ethers, upgrades } from "hardhat";
+import hre from "hardhat";
 import { expect } from "chai";
 
 describe("Storage Collision Upgrades", function () {
+  let ethers: any;
+  let upgrades: any;
+
+  before(async function () {
+    const connection = await hre.network.create();
+    ethers = connection.ethers;
+    const { upgrades: upgradesFactory } = await import("@openzeppelin/hardhat-upgrades");
+    upgrades = await upgradesFactory(hre, connection);
+  });
   it("should validate BaseLogic upgradeability without storage collisions (Correct Gap Adjustment)", async function () {
     const V1 = await ethers.getContractFactory("MockContractV1");
     const V2_Correct = await ethers.getContractFactory("MockContractV2_Correct");

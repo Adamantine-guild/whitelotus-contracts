@@ -12,3 +12,10 @@ lib/
 
 # Local binaries
 /foundry-bin/
+
+# Node/Hardhat
+node_modules/
+artifacts/
+cache/
+typechain/
+typechain-types/
