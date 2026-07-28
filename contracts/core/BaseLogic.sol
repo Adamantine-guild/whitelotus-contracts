@@ -8,11 +8,6 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 /// @title BaseLogic - Base contract for all upgradeable logic contracts
 /// @notice Implements the __gap pattern to prevent storage collisions during upgrades.
 abstract contract BaseLogic is Initializable, UUPSUpgradeable, OwnableUpgradeable {
-import {Initializable} from "openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
-
-/// @title BaseLogic - Base contract for all upgradeable logic contracts
-/// @notice Implements the __gap pattern to prevent storage collisions during upgrades.
-abstract contract BaseLogic is Initializable {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();

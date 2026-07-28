@@ -11,7 +11,7 @@ contract VaultHalmosTest is Test {
     address internal owner = makeAddr("owner");
 
     function setUp() public {
-        underlying = new MockERC20();
+        underlying = new MockERC20("Mock Token", "MTK", 18);
         vault = new Vault(underlying, "Vault Share", "vSHARE", owner);
         
         // Give the vault some initial underlying balance so totalAssets > 0 is possible
