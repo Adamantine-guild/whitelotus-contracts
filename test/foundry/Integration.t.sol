@@ -15,7 +15,7 @@ contract IntegrationTest is Test {
         vm.deal(admin, 100 ether);
         vm.deal(grantee, 1 ether);
 
-        factory = new GrantRoundFactory();
+        factory = new GrantRoundFactory(address(1));
 
         vm.prank(admin);
         address roundAddress = factory.createRound("Round X", "ipfs://roundX", 10 ether, admin);

@@ -21,7 +21,7 @@ contract PausableAndEventsTest is Test {
         vm.deal(stranger, 1 ether);
 
         vm.prank(admin);
-        round = new GrantRound("Round 1", "ipfs://round1", 10 ether, admin);
+        round = new GrantRound("Round 1", "ipfs://round1", 10 ether, admin, address(1));
     }
 
     function testDepositRevertsWhenPaused() public {
