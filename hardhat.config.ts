@@ -1,6 +1,7 @@
 import { HardhatUserConfig } from "hardhat/config";
 import hhEthers from "@nomicfoundation/hardhat-ethers";
 import hhUpgrades from "@openzeppelin/hardhat-upgrades";
+import hhFoundry from "@nomicfoundation/hardhat-foundry";
 
 const config: HardhatUserConfig = {
   solidity: "0.8.24",
@@ -10,7 +11,8 @@ const config: HardhatUserConfig = {
   },
   plugins: [
     hhEthers,
-    hhUpgrades
+    hhUpgrades,
+    hhFoundry
   ]
 };
 
