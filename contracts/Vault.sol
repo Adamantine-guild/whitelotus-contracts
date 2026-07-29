@@ -6,6 +6,7 @@ import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from
     "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IERC20Permit} from "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/utils/Pausable.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -163,6 +164,71 @@ contract Vault is ERC4626, Ownable, Pausable {
         whenNotPaused
         returns (uint256 shares)
     {
+        shares = deposit(assets, receiver);
+        if (shares < minSharesOut) revert SlippageExceeded(shares, minSharesOut);
+    }
+
+    /// @notice Deposit `assets` using an EIP-2612 permit signature.
+    /// @param  assets   Amount of underlying asset to deposit.
+    /// @param  receiver Address that receives the newly minted shares.
+    /// @param  deadline Deadline for the permit signature.
+    /// @param  v        v parameter of the permit signature.
+    /// @param  r        r parameter of the permit signature.
+    /// @param  s        s parameter of the permit signature.
+    /// @return shares   Actual shares minted.
+    function deposit(
+        uint256 assets,
+        address receiver,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) public whenNotPaused returns (uint256 shares) {
+        try IERC20Permit(asset()).permit(msg.sender, address(this), assets, deadline, v, r, s) {}
+        catch (bytes memory reason) {
+            if (IERC20(asset()).allowance(msg.sender, address(this)) < assets) {
+                if (reason.length > 0) {
+                    assembly {
+                        revert(add(32, reason), mload(reason))
+                    }
+                } else {
+                    revert("Vault: Permit failed and allowance insufficient");
+                }
+            }
+        }
+        return deposit(assets, receiver);
+    }
+
+    /// @notice Deposit `assets` with slippage protection and an EIP-2612 permit signature.
+    /// @param  assets       Amount of underlying asset to deposit.
+    /// @param  receiver     Address that receives the newly minted shares.
+    /// @param  minSharesOut Minimum acceptable shares.
+    /// @param  deadline     Deadline for the permit signature.
+    /// @param  v            v parameter of the permit signature.
+    /// @param  r            r parameter of the permit signature.
+    /// @param  s            s parameter of the permit signature.
+    /// @return shares       Actual shares minted.
+    function deposit(
+        uint256 assets,
+        address receiver,
+        uint256 minSharesOut,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external whenNotPaused returns (uint256 shares) {
+        try IERC20Permit(asset()).permit(msg.sender, address(this), assets, deadline, v, r, s) {}
+        catch (bytes memory reason) {
+            if (IERC20(asset()).allowance(msg.sender, address(this)) < assets) {
+                if (reason.length > 0) {
+                    assembly {
+                        revert(add(32, reason), mload(reason))
+                    }
+                } else {
+                    revert("Vault: Permit failed and allowance insufficient");
+                }
+            }
+        }
         shares = deposit(assets, receiver);
         if (shares < minSharesOut) revert SlippageExceeded(shares, minSharesOut);
     }
