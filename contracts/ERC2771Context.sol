@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 /// @title ERC2771Context
 /// @notice Provides meta-transaction support following ERC-2771.
 /// @dev Inheriting contracts should use `_msgSender()` instead of `msg.sender`
@@ -10,6 +11,8 @@ pragma solidity ^0.8.24;
 ///      signer's address (20 bytes) to the calldata.  This contract peels those bytes off to
 ///      recover the true sender; for all other callers it falls back to the raw `msg.sender`.
 abstract contract ERC2771Context {
+    error ZeroForwarder();
+
     // ─── State ──────────────────────────────────────────────────────────────
 
     /// @dev The one forwarder contract that is allowed to relay meta-transactions.
@@ -19,7 +22,7 @@ abstract contract ERC2771Context {
 
     /// @param trustedForwarder_ Address of the EIP-712 forwarder contract.
     constructor(address trustedForwarder_) {
-        require(trustedForwarder_ != address(0), "ERC2771: zero forwarder");
+        if (!(trustedForwarder_ != address(0))) revert ZeroForwarder();
         _trustedForwarder = trustedForwarder_;
     }
 

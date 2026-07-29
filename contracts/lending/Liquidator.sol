@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 import {CDPEngine} from "./CDPEngine.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -11,6 +12,9 @@ import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/Safe
  *         Pulls stablecoins from caller, executes liquidation, and returns seized collateral.
  */
 contract Liquidator {
+    error ZeroCDPEngine();
+    error ZeroStablecoin();
+
     using SafeERC20 for IERC20;
 
     CDPEngine public immutable cdpEngine;
@@ -25,8 +29,8 @@ contract Liquidator {
     );
 
     constructor(CDPEngine cdpEngine_, IERC20 stablecoin_) {
-        require(address(cdpEngine_) != address(0), "Liquidator: Zero CDP Engine");
-        require(address(stablecoin_) != address(0), "Liquidator: Zero stablecoin");
+        if (!(address(cdpEngine_) != address(0))) revert ZeroCDPEngine();
+        if (!(address(stablecoin_) != address(0))) revert ZeroStablecoin();
         cdpEngine = cdpEngine_;
         stablecoin = stablecoin_;
     }

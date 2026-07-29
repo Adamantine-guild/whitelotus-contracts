@@ -177,7 +177,7 @@ contract MetaTransactionTest is Test {
 
         // Second attempt with the same nonce must revert.
         vm.prank(relayer);
-        vm.expectRevert("MinimalForwarder: nonce mismatch");
+        vm.expectRevert(MinimalForwarder.NonceMismatch.selector);
         forwarder.execute(req, sig);
     }
 
@@ -193,7 +193,7 @@ contract MetaTransactionTest is Test {
         vm.warp(req.deadline + 1);
 
         vm.prank(relayer);
-        vm.expectRevert("MinimalForwarder: expired");
+        vm.expectRevert(MinimalForwarder.Expired.selector);
         forwarder.execute(req, sig);
     }
 
@@ -210,7 +210,7 @@ contract MetaTransactionTest is Test {
         bytes memory badSig = _sign(attackerKey, _digest(req));
 
         vm.prank(relayer);
-        vm.expectRevert("MinimalForwarder: invalid signature");
+        vm.expectRevert(MinimalForwarder.InvalidSignature.selector);
         forwarder.execute(req, badSig);
     }
 
@@ -227,7 +227,7 @@ contract MetaTransactionTest is Test {
         bytes memory sig = _sign(signerKey, _digest(req));
 
         vm.prank(relayer);
-        vm.expectRevert("MinimalForwarder: nonce mismatch");
+        vm.expectRevert(MinimalForwarder.NonceMismatch.selector);
         forwarder.execute(req, sig);
     }
 
@@ -343,7 +343,7 @@ contract MetaTransactionTest is Test {
             _buildAndSign(strangerKey, address(round), evidData);
 
         vm.prank(relayer);
-        vm.expectRevert("not grantee");
+        vm.expectRevert(GrantRound.NotGrantee.selector);
         forwarder.execute(req2, sig2);
     }
 
@@ -417,7 +417,7 @@ contract MetaTransactionTest is Test {
             _buildAndSign(signerKey, address(gov), revealData);
 
         vm.prank(relayer);
-        vm.expectRevert("Commit mismatch");
+        vm.expectRevert(Governance.CommitMismatch.selector);
         forwarder.execute(req2, sig2);
     }
 
@@ -438,7 +438,7 @@ contract MetaTransactionTest is Test {
             _buildAndSign(signerKey, address(round), data);
 
         vm.prank(relayer);
-        vm.expectRevert("Not admin");
+        vm.expectRevert(GrantRound.NotAdmin.selector);
         forwarder.execute(req, sig);
     }
 
@@ -474,7 +474,7 @@ contract MetaTransactionTest is Test {
         vm.chainId(originalChain);
 
         vm.prank(relayer);
-        vm.expectRevert("MinimalForwarder: invalid signature");
+        vm.expectRevert(MinimalForwarder.InvalidSignature.selector);
         forwarder.execute(req, crossSig);
     }
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 import {AppStorage} from "../../libraries/AppStorage.sol";
 
 interface IFlashloanReceiver {
@@ -10,6 +11,8 @@ interface IFlashloanReceiver {
 }
 
 contract FlashloanFacet {
+    error ExecutionFailed();
+
     AppStorage internal s;
 
     event FlashloanExecuted(address indexed receiver, address token, uint256 amount, uint256 fee);
@@ -20,10 +23,7 @@ contract FlashloanFacet {
         uint256 fee = amount / 1000; // 0.1% mock fee
 
         // Callback to receiver
-        require(
-            IFlashloanReceiver(receiver).executeOperation(token, amount, fee, data),
-            "FlashloanFacet: Execution failed"
-        );
+        if (!(IFlashloanReceiver(receiver).executeOperation(token, amount, fee, data))) revert ExecutionFailed();
 
         s.totalFlashLoans += 1;
 
