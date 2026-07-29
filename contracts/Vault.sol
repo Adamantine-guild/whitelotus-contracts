@@ -200,6 +200,10 @@ contract Vault is ERC4626, Ownable, Pausable {
     /// @notice Address that receives swept protocol fees.
     address public treasury;
 
+    /// @notice Cumulative amount of fees swept across all tokens (denominated in each token's units).
+    ///         Each sweep increments this counter by the amount transferred.
+    uint256 public totalFeesSwept;
+
     /// @dev Restricts callers to the treasury or the contract owner.
     ///      Also ensures treasury has been set.
     modifier onlyTreasuryOrOwner() {
@@ -224,6 +228,7 @@ contract Vault is ERC4626, Ownable, Pausable {
     function sweepFees(address token) external onlyTreasuryOrOwner {
         uint256 amount = IERC20(token).balanceOf(address(this));
         if (amount == 0) revert NoFeesToSweep();
+        totalFeesSwept += amount;
         SafeERC20.safeTransfer(IERC20(token), treasury, amount);
         emit FeeSwept(token, treasury, amount);
     }

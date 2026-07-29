@@ -683,6 +683,7 @@ contract EIP4626Test is Test {
 
         assertEq(underlying.balanceOf(treasuryAddr), treasuryBefore + feeAmount);
         assertEq(underlying.balanceOf(address(vault)), vaultBefore - feeAmount);
+        assertEq(vault.totalFeesSwept(), feeAmount);
     }
 
     function testSweepFeesByOwner() public {
@@ -697,6 +698,7 @@ contract EIP4626Test is Test {
         vault.sweepFees(address(underlying));
 
         assertEq(underlying.balanceOf(treasuryAddr), feeAmount);
+        assertEq(vault.totalFeesSwept(), feeAmount);
     }
 
     function testSweepFeesRevertsNoFees() public {
@@ -790,5 +792,25 @@ contract EIP4626Test is Test {
         vm.prank(alice);
         uint256 assetsBack = vault.redeem(aliceShares, alice, alice);
         assertApproxEqAbs(assetsBack, 1_000e18, 2);
+    }
+
+    function testTotalFeesSweptAccumulatesAcrossSweeps() public {
+        address treasuryAddr = makeAddr("treasury");
+        vm.prank(owner);
+        vault.setTreasury(treasuryAddr);
+
+        // First sweep: 100 tokens
+        uint256 firstFee = 100e18;
+        underlying.mint(address(vault), firstFee);
+        vm.prank(owner);
+        vault.sweepFees(address(underlying));
+        assertEq(vault.totalFeesSwept(), firstFee);
+
+        // Second sweep: 50 more tokens
+        uint256 secondFee = 50e18;
+        underlying.mint(address(vault), secondFee);
+        vm.prank(owner);
+        vault.sweepFees(address(underlying));
+        assertEq(vault.totalFeesSwept(), firstFee + secondFee);
     }
 }
