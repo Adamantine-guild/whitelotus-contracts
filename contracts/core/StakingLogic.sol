@@ -13,7 +13,7 @@ contract StakingLogic is BaseLogic {
         _disableInitializers();
     }
 
-    function initialize(address initialOwner) initializer public {
+    function initialize(address initialOwner) public initializer {
         __Ownable_init();
         if (initialOwner != msg.sender) _transferOwnership(initialOwner);
     }

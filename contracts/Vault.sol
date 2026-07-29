@@ -4,8 +4,6 @@ pragma solidity ^0.8.24;
 import {ERC4626} from "openzeppelin-contracts/contracts/token/ERC20/extensions/ERC4626.sol";
 import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from
-    "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
@@ -252,6 +250,8 @@ contract Vault is ERC4626, Ownable, Pausable, ReentrancyGuard {
     /// @param token The ERC-20 token to sweep.
     function sweepFees(address token) external onlyTreasuryOrOwner {
         uint256 amount = IERC20(token).balanceOf(address(this));
+        // Exact zero means there is nothing to sweep.
+        // slither-disable-next-line incorrect-equality
         if (amount == 0) revert NoFeesToSweep();
         totalFeesSwept += amount;
         SafeERC20.safeTransfer(IERC20(token), treasury, amount);

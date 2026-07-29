@@ -8,7 +8,10 @@
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint:sol": "solhint --config solhint.config.json --ignore-path .solhintignore \"contracts/**/*.sol\"",
+    "lint:sol:fix": "solhint --config solhint.config.json --ignore-path .solhintignore --fix \"contracts/**/*.sol\"",
+    "security:solhint": "solhint --config solhint.config.json --ignore-path .solhintignore --max-warnings 0 \"contracts/**/*.sol\""
   },
   "repository": {
     "type": "git",
@@ -31,7 +34,9 @@
     "@types/chai": "^5.2.3",
     "chai": "^6.2.2",
     "ethers": "^6.17.0",
-    "hardhat": "^3.11.1"
+    "hardhat": "^3.11.1",
+    "mocha": "^11.7.6",
+    "solhint": "^5.2.0"
   },
   "dependencies": {
     "@openzeppelin/contracts": "4.9.0",

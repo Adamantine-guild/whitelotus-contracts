@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-
-import "./BitMath.sol";
+import {BitMath} from "./BitMath.sol";
 
 /// @title TickBitmap - O(1) bitwise tick lookup for concentrated liquidity
 /// @notice Stores initialized ticks as bits in a packed bitmap. Each uint256 word covers

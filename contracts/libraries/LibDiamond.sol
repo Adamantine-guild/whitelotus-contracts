@@ -19,7 +19,7 @@ library LibDiamond {
     error IncorrectAction();
     error InitFunctionReverted();
 
-    bytes32 constant DIAMOND_STORAGE_POSITION = keccak256("diamond.standard.diamond.storage");
+    bytes32 internal constant DIAMOND_STORAGE_POSITION = keccak256("diamond.standard.diamond.storage");
 
     struct FacetAddressAndSelectorPosition {
         address facetAddress;
@@ -124,7 +124,9 @@ library LibDiamond {
             bytes4 selector = _functionSelectors[selectorIndex];
             FacetAddressAndSelectorPosition memory oldFacetAddressAndSelectorPosition =
                 ds.facetAddressAndSelectorPosition[selector];
-            if (!(oldFacetAddressAndSelectorPosition.facetAddress != address(0))) revert FunctionDoesNotExistForRemoval();
+            if (!(oldFacetAddressAndSelectorPosition.facetAddress != address(0))) {
+                revert FunctionDoesNotExistForRemoval();
+            }
 
             // replace selector with last selector
             selectorCount--;

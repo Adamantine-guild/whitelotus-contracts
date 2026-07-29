@@ -118,11 +118,11 @@ contract OptimisticOracle {
         if (!(!proposal.resolved)) revert AlreadyResolved();
         if (!(block.timestamp <= proposal.timestamp + challengeWindow)) revert ChallengeWindowPassed();
 
-        // Pull bond from disputer
-        bondToken.safeTransferFrom(msg.sender, address(this), bondAmount);
-
+        // CEI: mark disputed before pulling the disputer bond.
         proposal.disputed = true;
         proposal.disputer = msg.sender;
+
+        bondToken.safeTransferFrom(msg.sender, address(this), bondAmount);
 
         emit PriceDisputed(proposalId, msg.sender, asset);
     }

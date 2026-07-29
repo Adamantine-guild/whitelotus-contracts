@@ -5,9 +5,6 @@ import {
     ERC4626Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {
-    ERC20Upgradeable
-} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import {
     AccessControlUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {
@@ -238,7 +235,8 @@ contract WhiteLotusERC4626 is
     }
 
     /// @notice Retire a strategy, returning everything it holds to the idle buffer.
-    function removeStrategy(address strategy) external onlyRole(GOVERNOR_ROLE) {
+    // slither-disable-next-line reentrancy-no-eth
+    function removeStrategy(address strategy) external onlyRole(GOVERNOR_ROLE) nonReentrant {
         StrategyParams storage params = _activeStrategy(strategy);
         totalTargetBps -= params.targetBps;
 
@@ -254,7 +252,8 @@ contract WhiteLotusERC4626 is
     /// @dev The old strategy must be able to hand back its entire position; a partial exit reverts
     ///      the whole migration rather than stranding assets in a contract the vault has dropped.
     ///      A shortfall against the pre-migration report is surfaced as a loss.
-    function migrateStrategy(address from, address to) external onlyRole(GOVERNOR_ROLE) {
+    // slither-disable-next-line reentrancy-no-eth
+    function migrateStrategy(address from, address to) external onlyRole(GOVERNOR_ROLE) nonReentrant {
         StrategyParams storage source = _activeStrategy(from);
         if (to == address(0)) revert ZeroAddress();
         if (strategyParams[to].active) revert StrategyAlreadyRegistered(to);
@@ -277,13 +276,13 @@ contract WhiteLotusERC4626 is
     }
 
     /// @notice Compound one strategy's yield and book the result against its principal.
-    function harvest(address strategy) external onlyRole(KEEPER_ROLE) {
+    function harvest(address strategy) external onlyRole(KEEPER_ROLE) nonReentrant {
         _activeStrategy(strategy);
         _harvest(strategy);
     }
 
     /// @notice Compound every strategy and push the freed capital back out to target weights.
-    function harvestAll() external onlyRole(KEEPER_ROLE) {
+    function harvestAll() external onlyRole(KEEPER_ROLE) nonReentrant {
         uint256 length = _strategies.length;
         for (uint256 i = 0; i < length; ++i) {
             _harvest(_strategies[i]);
@@ -292,7 +291,7 @@ contract WhiteLotusERC4626 is
     }
 
     /// @notice Move capital between the idle buffer and the strategies to match target weights.
-    function rebalance() external onlyRole(KEEPER_ROLE) {
+    function rebalance() external onlyRole(KEEPER_ROLE) nonReentrant {
         _rebalance();
     }
 
@@ -307,6 +306,8 @@ contract WhiteLotusERC4626 is
 
     /// @dev Tops the idle buffer up from the strategies before the shares are burned, so a user
     ///      exit never depends on the keeper having rebalanced recently.
+    ///      Balance is read before strategy withdrawals; public withdraw/redeem are nonReentrant.
+    // slither-disable-next-line reentrancy-balance
     function _withdraw(
         address caller,
         address receiver,
@@ -328,16 +329,21 @@ contract WhiteLotusERC4626 is
     error EOAUpgradeNotAllowed();
 
     function _authorizeUpgrade(address) internal override onlyRole(DEFAULT_ADMIN_ROLE) {
+        // Intentional: upgrades must be initiated via a contract (e.g. multisig), never an EOA.
+        // solhint-disable-next-line avoid-tx-origin
         if (tx.origin == msg.sender) revert EOAUpgradeNotAllowed();
     }
 
     /// @dev Draws from strategies in queue order until `needed` is covered or they run dry.
+    // slither-disable-next-line reentrancy-no-eth
     function _pullFromStrategies(uint256 needed) private returns (uint256 raised) {
         uint256 length = _strategies.length;
 
         for (uint256 i = 0; i < length && raised < needed; ++i) {
             address strategy = _strategies[i];
             uint256 received = IStrategy(strategy).withdraw(needed - raised);
+            // Exact zero means this strategy cannot contribute further in this pass.
+            // slither-disable-next-line incorrect-equality
             if (received == 0) continue;
 
             raised += received;
@@ -345,6 +351,7 @@ contract WhiteLotusERC4626 is
         }
     }
 
+    // slither-disable-next-line reentrancy-no-eth
     function _rebalance() private {
         uint256 total = totalAssets();
         uint256 length = _strategies.length;
@@ -406,10 +413,14 @@ contract WhiteLotusERC4626 is
         IERC20 assetToken = IERC20(asset());
         uint256 balanceBefore = assetToken.balanceOf(address(this));
 
+        // Return value is ignored: returned amount is measured via balanceOf below.
+        // slither-disable-next-line unused-return
         IStrategy(strategy).withdrawAll();
         returned = assetToken.balanceOf(address(this)) - balanceBefore;
 
         uint256 remaining = IStrategy(strategy).totalAssets();
+        // Exact remaining balance must be zero for a complete exit.
+        // slither-disable-next-line incorrect-equality
         if (remaining != 0) revert IncompleteExit(strategy, remaining);
     }
 

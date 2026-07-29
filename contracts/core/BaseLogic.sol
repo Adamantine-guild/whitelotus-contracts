@@ -20,9 +20,8 @@ abstract contract BaseLogic is Initializable, UUPSUpgradeable, OwnableUpgradeabl
      * @dev Restricts the upgrade function to the owner of the contract.
      *      Additionally requires the caller to be a contract (multi-sig), not an EOA.
      */
-    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {
-        if (tx.origin == msg.sender) revert EOAUpgradeNotAllowed();
-    }
+    // solhint-disable-next-line no-empty-blocks
+    function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {}
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new

@@ -1,0 +1,6 @@
+{
+  "filter_paths": "node_modules|lib|test|script|contracts/mocks",
+  "exclude_dependencies": true,
+  "detectors_to_exclude": "naming-convention,solc-version",
+  "fail_on": "medium"
+}

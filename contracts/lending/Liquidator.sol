@@ -47,6 +47,7 @@ contract Liquidator {
      */
     function liquidatePosition(address collateralType, address user, uint256 debtToCover) external {
         // Enforce partial liquidation cap
+        // slither-disable-next-line unused-return
         (, uint256 debt) = cdpEngine.positions(collateralType, user);
         uint256 maxLiquidatable = (debt * MAX_LIQUIDATION_PORTION) / 1e18;
         require(debtToCover <= maxLiquidatable, "Liquidator: Exceeds partial liquidation cap");
@@ -59,7 +60,7 @@ contract Liquidator {
         stablecoin.safeTransferFrom(msg.sender, address(this), debtToCover);
 
         // Approve CDPEngine to spend stablecoin
-        stablecoin.approve(address(cdpEngine), debtToCover);
+        stablecoin.forceApprove(address(cdpEngine), debtToCover);
 
         // Get collateral balance before
         uint256 balanceBefore = IERC20(collateralType).balanceOf(address(this));

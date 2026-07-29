@@ -206,7 +206,7 @@ contract GrantRound is ERC2771Context {
         if (!(_milestones[appId].length == 0)) revert AlreadySet();
         if (!(amounts.length > 0)) revert NoMilestones();
 
-        uint256 total;
+        uint256 total = 0;
         for (uint256 i = 0; i < amounts.length; i++) {
             if (!(amounts[i] > 0)) revert ZeroMilestoneAmount();
             _milestones[appId].push(

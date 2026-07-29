@@ -49,7 +49,11 @@ contract AaveYieldStrategy is BaseStrategy {
 
         if (loose < assets) {
             uint256 redeemable = Math.min(assets - loose, aToken.balanceOf(address(this)));
-            if (redeemable > 0) pool.withdraw(address(_asset), redeemable, address(this));
+            if (redeemable > 0) {
+                // Return value is ignored: freed amount is measured via balanceOf below.
+                // slither-disable-next-line unused-return
+                pool.withdraw(address(_asset), redeemable, address(this));
+            }
         }
 
         freed = _asset.balanceOf(address(this));
@@ -57,6 +61,8 @@ contract AaveYieldStrategy is BaseStrategy {
 
     function _divestAll() internal override returns (uint256 freed) {
         if (aToken.balanceOf(address(this)) > 0) {
+            // Return value is ignored: freed amount is measured via balanceOf below.
+            // slither-disable-next-line unused-return
             pool.withdraw(address(_asset), type(uint256).max, address(this));
         }
 

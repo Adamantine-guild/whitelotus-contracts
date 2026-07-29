@@ -12,6 +12,8 @@ contract DiamondCutFacet is IDiamondCut {
         external
         override
     {
+        // Intentional: upgrades must be initiated via a contract (e.g. multisig), never an EOA.
+        // solhint-disable-next-line avoid-tx-origin
         if (tx.origin == msg.sender) revert EOAUpgradeNotAllowed();
         LibDiamond.enforceIsContractOwner();
         LibDiamond.diamondCut(_diamondCut, _init, _calldata);

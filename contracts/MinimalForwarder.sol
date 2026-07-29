@@ -186,7 +186,6 @@ contract MinimalForwarder {
             if (returnData.length > 0) {
                 // solhint-disable-next-line no-inline-assembly
                 assembly {
-                    let ptr := mload(0x40)
                     revert(add(returnData, 32), mload(returnData))
                 }
             }

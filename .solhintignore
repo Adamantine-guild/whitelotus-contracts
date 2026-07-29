@@ -1,0 +1,8 @@
+node_modules/
+lib/
+out/
+cache/
+artifacts/
+test/
+script/
+contracts/mocks/
