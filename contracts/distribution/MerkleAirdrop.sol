@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
@@ -10,6 +11,8 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
  * @notice Gas-optimized cryptographic airdrop claim contract utilizing Merkle trees and bitmap double-claim prevention.
  */
 contract MerkleAirdrop {
+    error InvalidTokenAddress();
+
     using SafeERC20 for IERC20;
 
     address public immutable token;
@@ -24,7 +27,7 @@ contract MerkleAirdrop {
     error InvalidProof();
 
     constructor(address _token, bytes32 _merkleRoot) {
-        require(_token != address(0), "Invalid token address");
+        if (!(_token != address(0))) revert InvalidTokenAddress();
         token = _token;
         merkleRoot = _merkleRoot;
     }

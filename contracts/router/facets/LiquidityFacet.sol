@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 import {AppStorage} from "../../libraries/AppStorage.sol";
 
 contract LiquidityFacet {
+    error InsufficientLiquidityBalance();
+
     AppStorage internal s;
 
     event LiquidityAdded(
@@ -39,9 +42,7 @@ contract LiquidityFacet {
         external
         returns (uint256 amountA, uint256 amountB)
     {
-        require(
-            s.balances[msg.sender] >= liquidity, "LiquidityFacet: Insufficient liquidity balance"
-        );
+        if (!(s.balances[msg.sender] >= liquidity)) revert InsufficientLiquidityBalance();
 
         amountA = liquidity / 2;
         amountB = liquidity - amountA;

@@ -120,7 +120,7 @@ contract OptimisticOracleTest is Test {
         skip(challengeWindow + 1);
 
         vm.prank(disputer);
-        vm.expectRevert("OptimisticOracle: Challenge window passed");
+        vm.expectRevert(OptimisticOracle.ChallengeWindowPassed.selector);
         oracle.disputePrice(asset, proposalId);
     }
 
@@ -133,7 +133,7 @@ contract OptimisticOracleTest is Test {
 
         // Standard user attempts to resolve
         vm.prank(proposer);
-        vm.expectRevert("OptimisticOracle: Only arbitrator can resolve");
+        vm.expectRevert(OptimisticOracle.OnlyArbitratorCanResolve.selector);
         oracle.resolveDispute(proposalId, true);
     }
 

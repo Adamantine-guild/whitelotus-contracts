@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
@@ -31,6 +32,23 @@ interface IMintableERC20 is IERC20 {
  *         and borrow a stablecoin using dynamic parameters and normalized fixed-point 18-decimal math.
  */
 contract CDPEngine is Ownable {
+    error ZeroStablecoin();
+    error ZeroToken();
+    error InvalidMinimumCollateralRatio();
+    error InvalidLiquidationPenalty();
+    error ZeroPriceFeed();
+    error CollateralNotWhitelisted();
+    error ZeroAmount();
+    error InsufficientCollateralBalance();
+    error PositionUnsafeAfterWithdrawal();
+    error BorrowExceedsMaxLTV();
+    error RepayExceedsDebt();
+    error PositionIsSafe();
+    error ZeroDebtToCover();
+    error CoverExceedsDebt();
+    error PriceFeedNotSet();
+    error InvalidPrice();
+
     using SafeERC20 for IERC20;
 
     // ─── Structs ────────────────────────────────────────────────────────────
@@ -79,7 +97,7 @@ contract CDPEngine is Ownable {
     // ─── Constructor ────────────────────────────────────────────────────────
 
     constructor(IMintableERC20 stablecoin_, address owner_) Ownable(owner_) {
-        require(address(stablecoin_) != address(0), "CDPEngine: Zero stablecoin");
+        if (!(address(stablecoin_) != address(0))) revert ZeroStablecoin();
         stablecoin = stablecoin_;
     }
 
@@ -90,9 +108,9 @@ contract CDPEngine is Ownable {
         uint256 minCollateralRatio,
         uint256 liquidationPenalty
     ) external onlyOwner {
-        require(token != address(0), "CDPEngine: Zero token");
-        require(minCollateralRatio >= 1e18, "CDPEngine: Ratio must be >= 100%");
-        require(liquidationPenalty >= 1e18, "CDPEngine: Penalty must be >= 100%");
+        if (!(token != address(0))) revert ZeroToken();
+        if (!(minCollateralRatio >= 1e18)) revert InvalidMinimumCollateralRatio();
+        if (!(liquidationPenalty >= 1e18)) revert InvalidLiquidationPenalty();
 
         collateralConfigs[token] = CollateralConfig({
             whitelisted: true,
@@ -104,9 +122,9 @@ contract CDPEngine is Ownable {
     }
 
     function setPriceFeed(address token, address priceFeed) external onlyOwner {
-        require(token != address(0), "CDPEngine: Zero token");
-        require(priceFeed != address(0), "CDPEngine: Zero price feed");
-        require(collateralConfigs[token].whitelisted, "CDPEngine: Collateral not whitelisted");
+        if (!(token != address(0))) revert ZeroToken();
+        if (!(priceFeed != address(0))) revert ZeroPriceFeed();
+        if (!(collateralConfigs[token].whitelisted)) revert CollateralNotWhitelisted();
 
         priceFeeds[token] = priceFeed;
         emit PriceFeedSet(token, priceFeed);
@@ -119,10 +137,8 @@ contract CDPEngine is Ownable {
     // ─── Collateral Operations ──────────────────────────────────────────────
 
     function depositCollateral(address collateralType, uint256 amount) external {
-        require(
-            collateralConfigs[collateralType].whitelisted, "CDPEngine: Collateral not whitelisted"
-        );
-        require(amount > 0, "CDPEngine: Zero amount");
+        if (!(collateralConfigs[collateralType].whitelisted)) revert CollateralNotWhitelisted();
+        if (!(amount > 0)) revert ZeroAmount();
 
         positions[collateralType][msg.sender].collateral += amount;
 
@@ -133,17 +149,14 @@ contract CDPEngine is Ownable {
 
     function withdrawCollateral(address collateralType, uint256 amount) external {
         Position storage pos = positions[collateralType][msg.sender];
-        require(amount > 0, "CDPEngine: Zero amount");
-        require(pos.collateral >= amount, "CDPEngine: Insufficient collateral balance");
+        if (!(amount > 0)) revert ZeroAmount();
+        if (!(pos.collateral >= amount)) revert InsufficientCollateralBalance();
 
         pos.collateral -= amount;
 
         // Position safety check (only if there is active debt)
         if (pos.debt > 0) {
-            require(
-                isPositionSafe(collateralType, msg.sender),
-                "CDPEngine: Position unsafe after withdrawal"
-            );
+            if (!(isPositionSafe(collateralType, msg.sender))) revert PositionUnsafeAfterWithdrawal();
         }
 
         IERC20(collateralType).safeTransfer(msg.sender, amount);
@@ -154,15 +167,13 @@ contract CDPEngine is Ownable {
     // ─── Debt Operations ────────────────────────────────────────────────────
 
     function borrow(address collateralType, uint256 amount) external {
-        require(
-            collateralConfigs[collateralType].whitelisted, "CDPEngine: Collateral not whitelisted"
-        );
-        require(amount > 0, "CDPEngine: Zero amount");
+        if (!(collateralConfigs[collateralType].whitelisted)) revert CollateralNotWhitelisted();
+        if (!(amount > 0)) revert ZeroAmount();
 
         Position storage pos = positions[collateralType][msg.sender];
         pos.debt += amount;
 
-        require(isPositionSafe(collateralType, msg.sender), "CDPEngine: Borrow exceeds max LTV");
+        if (!(isPositionSafe(collateralType, msg.sender))) revert BorrowExceedsMaxLTV();
 
         stablecoin.mint(msg.sender, amount);
 
@@ -171,8 +182,8 @@ contract CDPEngine is Ownable {
 
     function repay(address collateralType, uint256 amount) external {
         Position storage pos = positions[collateralType][msg.sender];
-        require(amount > 0, "CDPEngine: Zero amount");
-        require(pos.debt >= amount, "CDPEngine: Repay exceeds debt");
+        if (!(amount > 0)) revert ZeroAmount();
+        if (!(pos.debt >= amount)) revert RepayExceedsDebt();
 
         pos.debt -= amount;
 
@@ -183,20 +194,13 @@ contract CDPEngine is Ownable {
 
     // ─── Liquidation ────────────────────────────────────────────────────────
 
-    function liquidate(
-        address collateralType, 
-        address user, 
-        uint256 debtToCover,
-        uint256 appliedPenalty
-    ) external {
-        require(msg.sender == liquidatorRole, "CDPEngine: Only liquidator");
-        require(
-            collateralConfigs[collateralType].whitelisted, "CDPEngine: Collateral not whitelisted"
-        );
+    function liquidate(address collateralType, address user, uint256 debtToCover) external {
+        if (!(collateralConfigs[collateralType].whitelisted)) revert CollateralNotWhitelisted();
         Position storage pos = positions[collateralType][user];
 
-        require(debtToCover > 0, "CDPEngine: Zero debt to cover");
-        require(pos.debt >= debtToCover, "CDPEngine: Cover exceeds debt");
+        if (!(!isPositionSafe(collateralType, user))) revert PositionIsSafe();
+        if (!(debtToCover > 0)) revert ZeroDebtToCover();
+        if (!(pos.debt >= debtToCover)) revert CoverExceedsDebt();
 
         uint256 price = getNormalizedPrice(collateralType);
 
@@ -252,10 +256,10 @@ contract CDPEngine is Ownable {
 
     function getNormalizedPrice(address token) public view returns (uint256) {
         address feed = priceFeeds[token];
-        require(feed != address(0), "CDPEngine: Price feed not set");
+        if (!(feed != address(0))) revert PriceFeedNotSet();
 
         (, int256 answer,,,) = AggregatorV3Interface(feed).latestRoundData();
-        require(answer > 0, "CDPEngine: Invalid price");
+        if (!(answer > 0)) revert InvalidPrice();
 
         uint8 decimals = AggregatorV3Interface(feed).decimals();
         if (decimals == 18) {

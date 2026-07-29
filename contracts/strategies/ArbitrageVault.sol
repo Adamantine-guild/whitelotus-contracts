@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 import {Vault} from "../Vault.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
@@ -16,6 +17,13 @@ interface IERC3156FlashLender {
 }
 
 contract ArbitrageVault is Vault, ReentrancyGuard, IERC3156FlashBorrower {
+    error ZeroAddress();
+    error UnauthorizedCaller();
+    error UntrustedLender();
+    error UnauthorizedInitiator();
+    error InsufficientBalanceForRepayment();
+    error SwapStepFailed();
+
     // ─── Structs ────────────────────────────────────────────────────────────
 
     struct SwapStep {
@@ -43,13 +51,13 @@ contract ArbitrageVault is Vault, ReentrancyGuard, IERC3156FlashBorrower {
     // ─── Whitelist Management ───────────────────────────────────────────────
 
     function setApprovedLender(address lender, bool approved) external onlyOwner {
-        require(lender != address(0), "ArbitrageVault: Zero address");
+        if (!(lender != address(0))) revert ZeroAddress();
         approvedLenders[lender] = approved;
         emit LenderSet(lender, approved);
     }
 
     function setKeeper(address keeper, bool active) external onlyOwner {
-        require(keeper != address(0), "ArbitrageVault: Zero address");
+        if (!(keeper != address(0))) revert ZeroAddress();
         keepers[keeper] = active;
         emit KeeperSet(keeper, active);
     }
@@ -59,8 +67,8 @@ contract ArbitrageVault is Vault, ReentrancyGuard, IERC3156FlashBorrower {
     function initiateFlashLoan(address lender, address token, uint256 amount, bytes calldata data)
         external
     {
-        require(msg.sender == owner() || keepers[msg.sender], "ArbitrageVault: Unauthorized caller");
-        require(approvedLenders[lender], "ArbitrageVault: Untrusted lender");
+        if (!(msg.sender == owner() || keepers[msg.sender])) revert UnauthorizedCaller();
+        if (!(approvedLenders[lender])) revert UntrustedLender();
 
         IERC3156FlashLender(lender).flashLoan(this, token, amount, data);
     }
@@ -74,8 +82,8 @@ contract ArbitrageVault is Vault, ReentrancyGuard, IERC3156FlashBorrower {
         uint256 fee,
         bytes calldata data
     ) external override nonReentrant returns (bytes32) {
-        require(approvedLenders[msg.sender], "ArbitrageVault: Untrusted lender");
-        require(initiator == address(this), "ArbitrageVault: Unauthorized initiator");
+        if (!(approvedLenders[msg.sender])) revert UntrustedLender();
+        if (!(initiator == address(this))) revert UnauthorizedInitiator();
 
         uint256 balanceBefore = IERC20(token).balanceOf(address(this));
 
@@ -90,7 +98,7 @@ contract ArbitrageVault is Vault, ReentrancyGuard, IERC3156FlashBorrower {
                         revert(add(32, returnData), returndata_size)
                     }
                 } else {
-                    revert("ArbitrageVault: Swap step failed");
+                    revert SwapStepFailed();
                 }
             }
         }
@@ -98,7 +106,7 @@ contract ArbitrageVault is Vault, ReentrancyGuard, IERC3156FlashBorrower {
         uint256 balanceAfter = IERC20(token).balanceOf(address(this));
         uint256 repayment = amount + fee;
 
-        require(balanceAfter >= repayment, "ArbitrageVault: Insufficient balance for repayment");
+        if (!(balanceAfter >= repayment)) revert InsufficientBalanceForRepayment();
 
         // Approve lender to pull the repayment amount
         IERC20(token).approve(msg.sender, repayment);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 import {ERC2771Context} from "./ERC2771Context.sol";
 
 /// @title GrantRound - Minimal MVP grant round contract for GrantChain
@@ -10,6 +11,31 @@ import {ERC2771Context} from "./ERC2771Context.sol";
 ///         original signer rather than the forwarder address.
 /// @dev Intentionally simple: single admin, ETH-only escrow, URI-based metadata.
 contract GrantRound is ERC2771Context {
+    error NotAdmin();
+    error Reentrancy();
+    error ContractPaused();
+    error ZeroAdminAddress();
+    error AlreadyPaused();
+    error NotPaused();
+    error UriEmpty();
+    error ApplicationDoesNotExist();
+    error NotPending();
+    error ApplicationNotApproved();
+    error AlreadySet();
+    error NoMilestones();
+    error ZeroMilestoneAmount();
+    error NotGrantee();
+    error InvalidMilestoneIndex();
+    error AlreadySubmitted();
+    error EvidenceEmpty();
+    error NotSubmitted();
+    error AlreadyApproved();
+    error MilestoneNotApproved();
+    error MilestoneAlreadyPaid();
+    error InsufficientFunds();
+    error TransferFailed();
+    error ClawbackFailed();
+
     /// @dev Single admin for this round. TODO: future governance adapter/roles
     address public immutable admin;
 
@@ -29,19 +55,19 @@ contract GrantRound is ERC2771Context {
     bool public paused;
 
     modifier onlyAdmin() {
-        require(_msgSender() == admin, "Not admin");
+        if (!(_msgSender() == admin)) revert NotAdmin();
         _;
     }
 
     modifier nonReentrant() {
-        require(!_locked, "Reentrancy");
+        if (!(!_locked)) revert Reentrancy();
         _locked = true;
         _;
         _locked = false;
     }
 
     modifier whenNotPaused() {
-        require(!paused, "paused");
+        if (!(!paused)) revert ContractPaused();
         _;
     }
 
@@ -109,7 +135,7 @@ contract GrantRound is ERC2771Context {
         address _admin,
         address _trustedForwarder
     ) ERC2771Context(_trustedForwarder) {
-        require(_admin != address(0), "admin=0");
+        if (!(_admin != address(0))) revert ZeroAdminAddress();
         roundTitle = _title;
         metadataURI = _metadataURI;
         budget = _budget;
@@ -128,14 +154,14 @@ contract GrantRound is ERC2771Context {
 
     /// @notice Emergency stop: halts deposit() until unpaused (#1)
     function pause() external onlyAdmin {
-        require(!paused, "already paused");
+        if (!(!paused)) revert AlreadyPaused();
         paused = true;
         emit Paused(_msgSender());
     }
 
     /// @notice Resume deposit() after a pause (#1)
     function unpause() external onlyAdmin {
-        require(paused, "not paused");
+        if (!(paused)) revert NotPaused();
         paused = false;
         emit Unpaused(_msgSender());
     }
@@ -144,7 +170,7 @@ contract GrantRound is ERC2771Context {
     /// @param uri metadata URI describing the proposal
     /// @return appId id of the created application
     function submitApplication(string calldata uri) external returns (uint256 appId) {
-        require(bytes(uri).length > 0, "uri empty");
+        if (!(bytes(uri).length > 0)) revert UriEmpty();
         address sender = _msgSender();
         appId = ++applicationCount;
         applications[appId] =
@@ -155,8 +181,8 @@ contract GrantRound is ERC2771Context {
     /// @notice Approve a pending application
     function approveApplication(uint256 appId) external onlyAdmin {
         Application storage app = applications[appId];
-        require(app.applicant != address(0), "app !exists");
-        require(app.status == AppStatus.Pending, "not pending");
+        if (!(app.applicant != address(0))) revert ApplicationDoesNotExist();
+        if (!(app.status == AppStatus.Pending)) revert NotPending();
         app.status = AppStatus.Approved;
         emit ApplicationApproved(appId, _msgSender());
     }
@@ -164,8 +190,8 @@ contract GrantRound is ERC2771Context {
     /// @notice Reject a pending application
     function rejectApplication(uint256 appId) external onlyAdmin {
         Application storage app = applications[appId];
-        require(app.applicant != address(0), "app !exists");
-        require(app.status == AppStatus.Pending, "not pending");
+        if (!(app.applicant != address(0))) revert ApplicationDoesNotExist();
+        if (!(app.status == AppStatus.Pending)) revert NotPending();
         app.status = AppStatus.Rejected;
         emit ApplicationRejected(appId, _msgSender());
     }
@@ -175,14 +201,14 @@ contract GrantRound is ERC2771Context {
     /// @param amounts milestone amounts denominated in wei
     function createMilestones(uint256 appId, uint256[] calldata amounts) external onlyAdmin {
         Application storage app = applications[appId];
-        require(app.applicant != address(0), "app !exists");
-        require(app.status == AppStatus.Approved, "app !approved");
-        require(_milestones[appId].length == 0, "already set");
-        require(amounts.length > 0, "no milestones");
+        if (!(app.applicant != address(0))) revert ApplicationDoesNotExist();
+        if (!(app.status == AppStatus.Approved)) revert ApplicationNotApproved();
+        if (!(_milestones[appId].length == 0)) revert AlreadySet();
+        if (!(amounts.length > 0)) revert NoMilestones();
 
         uint256 total;
         for (uint256 i = 0; i < amounts.length; i++) {
-            require(amounts[i] > 0, "amount 0");
+            if (!(amounts[i] > 0)) revert ZeroMilestoneAmount();
             _milestones[appId].push(
                 Milestone({
                     amount: amounts[i],
@@ -203,14 +229,14 @@ contract GrantRound is ERC2771Context {
         external
     {
         Application storage app = applications[appId];
-        require(app.applicant != address(0), "app !exists");
-        require(app.status == AppStatus.Approved, "app !approved");
-        require(_msgSender() == app.applicant, "not grantee");
-        require(index < _milestones[appId].length, "bad index");
+        if (!(app.applicant != address(0))) revert ApplicationDoesNotExist();
+        if (!(app.status == AppStatus.Approved)) revert ApplicationNotApproved();
+        if (!(_msgSender() == app.applicant)) revert NotGrantee();
+        if (!(index < _milestones[appId].length)) revert InvalidMilestoneIndex();
 
         Milestone storage m = _milestones[appId][index];
-        require(!m.submitted, "already submitted");
-        require(bytes(evidenceURI).length > 0, "evidence empty");
+        if (!(!m.submitted)) revert AlreadySubmitted();
+        if (!(bytes(evidenceURI).length > 0)) revert EvidenceEmpty();
         m.evidenceURI = evidenceURI;
         m.submitted = true;
         emit MilestoneEvidenceSubmitted(appId, index, evidenceURI);
@@ -218,10 +244,10 @@ contract GrantRound is ERC2771Context {
 
     /// @notice Admin approves submitted milestone evidence
     function approveMilestone(uint256 appId, uint256 index) external onlyAdmin {
-        require(index < _milestones[appId].length, "bad index");
+        if (!(index < _milestones[appId].length)) revert InvalidMilestoneIndex();
         Milestone storage m = _milestones[appId][index];
-        require(m.submitted, "not submitted");
-        require(!m.approved, "already approved");
+        if (!(m.submitted)) revert NotSubmitted();
+        if (!(!m.approved)) revert AlreadyApproved();
         m.approved = true;
         emit MilestoneApproved(appId, index, _msgSender());
     }
@@ -229,16 +255,16 @@ contract GrantRound is ERC2771Context {
     /// @notice Release payout for an approved milestone to the grantee
     function releasePayout(uint256 appId, uint256 index) external onlyAdmin nonReentrant {
         Application storage app = applications[appId];
-        require(app.applicant != address(0), "app !exists");
-        require(index < _milestones[appId].length, "bad index");
+        if (!(app.applicant != address(0))) revert ApplicationDoesNotExist();
+        if (!(index < _milestones[appId].length)) revert InvalidMilestoneIndex();
         Milestone storage m = _milestones[appId][index];
-        require(m.approved, "!approved");
-        require(!m.paid, "paid");
-        require(address(this).balance >= m.amount, "insufficient funds");
+        if (!(m.approved)) revert MilestoneNotApproved();
+        if (!(!m.paid)) revert MilestoneAlreadyPaid();
+        if (!(address(this).balance >= m.amount)) revert InsufficientFunds();
 
         m.paid = true;
         (bool ok,) = app.applicant.call{value: m.amount}("");
-        require(ok, "transfer failed");
+        if (!(ok)) revert TransferFailed();
         emit PayoutReleased(appId, index, app.applicant, m.amount);
     }
 
@@ -253,7 +279,7 @@ contract GrantRound is ERC2771Context {
         address recipient = to == address(0) ? admin : to;
         uint256 amt = address(this).balance;
         (bool ok,) = recipient.call{value: amt}("");
-        require(ok, "clawback failed");
+        if (!(ok)) revert ClawbackFailed();
         emit FundsClawedBack(recipient, amt);
     }
 }

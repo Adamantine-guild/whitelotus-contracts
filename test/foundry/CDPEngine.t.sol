@@ -90,7 +90,7 @@ contract CDPEngineTest is Test {
 
         // Price = $30k. Ratio = 150%. Max borrow = 20k.
         // Borrowing 20,001 LUSD should revert
-        vm.expectRevert("CDPEngine: Borrow exceeds max LTV");
+        vm.expectRevert(CDPEngine.BorrowExceedsMaxLTV.selector);
         engine.borrow(address(wbtc), 20_001 * 1e18);
         vm.stopPrank();
     }
@@ -104,7 +104,7 @@ contract CDPEngineTest is Test {
         engine.withdrawCollateral(address(wbtc), 0.4 * 10 ** 8);
 
         // Withdraw another 0.2 WBTC (leaves 0.4 WBTC = $12k collateral value). Unsafe.
-        vm.expectRevert("CDPEngine: Position unsafe after withdrawal");
+        vm.expectRevert(CDPEngine.PositionUnsafeAfterWithdrawal.selector);
         engine.withdrawCollateral(address(wbtc), 0.2 * 10 ** 8);
         vm.stopPrank();
     }
@@ -153,8 +153,8 @@ contract CDPEngineTest is Test {
         vm.startPrank(liquidatorUser);
         stablecoin.approve(address(engine), type(uint256).max);
 
-        vm.expectRevert("CDPEngine: Position is safe");
-        engine.liquidate(address(ethCollateral), user, 1000 * 1e18, 1.15 * 1e18);
+        vm.expectRevert(CDPEngine.PositionIsSafe.selector);
+        engine.liquidate(address(ethCollateral), user, 1000 * 1e18);
         vm.stopPrank();
     }
 }
