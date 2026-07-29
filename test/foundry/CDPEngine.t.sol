@@ -129,14 +129,14 @@ contract CDPEngineTest is Test {
         stablecoin.approve(address(liquidator), type(uint256).max);
 
         // Liquidator covers 5,000 LUSD debt via Liquidator helper.
-        // Health factor ≈ 0.974 → tier1Penalty (1.05e18).
-        // Seized value: 5000 * 1.05 = 5250 USD.
-        // Seized amount in ETH: 5250 * 1e18 / 1900 ≈ 2.763157894736842105 ETH
+        // ETH liquidationPenalty from collateral config is 1.15e18.
+        // Seized value: 5000 * 1.15 = 5750 USD.
+        // Seized amount in ETH: 5750 * 1e18 / 1900 ≈ 3.026315789473684210 ETH
         uint256 balanceBefore = ethCollateral.balanceOf(liquidatorUser);
         liquidator.liquidatePosition(address(ethCollateral), user, 5000 * 1e18);
         uint256 balanceAfter = ethCollateral.balanceOf(liquidatorUser);
 
-        uint256 expectedSeized = (uint256(5250) * 1e18) / 1900;
+        uint256 expectedSeized = (uint256(5750) * 1e18) / 1900;
         assertEq(balanceAfter - balanceBefore, expectedSeized);
         vm.stopPrank();
 
