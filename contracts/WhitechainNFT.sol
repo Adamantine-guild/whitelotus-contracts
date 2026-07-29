@@ -17,8 +17,10 @@ contract WhitechainNFT is ERC721, ERC721Enumerable, Ownable {
 
     constructor(string memory name_, string memory symbol_, address owner_)
         ERC721(name_, symbol_)
-        Ownable(owner_)
-    {}
+        Ownable()
+    {
+        if (owner_ != msg.sender) _transferOwnership(owner_);
+    }
 
     /**
      * @notice Mints a new token to `to`. Gated to owner/admin.
@@ -41,19 +43,11 @@ contract WhitechainNFT is ERC721, ERC721Enumerable, Ownable {
 
     // ─── Overrides ──────────────────────────────────────────────────────────
 
-    function _update(address to, uint256 tokenId, address auth)
-        internal
-        override(ERC721, ERC721Enumerable)
-        returns (address)
-    {
-        return super._update(to, tokenId, auth);
-    }
-
-    function _increaseBalance(address account, uint128 amount)
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
         internal
         override(ERC721, ERC721Enumerable)
     {
-        super._increaseBalance(account, amount);
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
     }
 
     function supportsInterface(bytes4 interfaceId)

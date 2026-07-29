@@ -12,14 +12,16 @@ import {
 } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {
     PausableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import {
-    ReentrancyGuardTransient
-} from "openzeppelin-contracts/contracts/utils/ReentrancyGuardTransient.sol";
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
+import {MathUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
 import {IStrategy} from "../interfaces/IStrategy.sol";
 
 /// @title WhiteLotusERC4626 - Tokenized vault routing capital across pluggable yield strategies
@@ -27,25 +29,19 @@ import {IStrategy} from "../interfaces/IStrategy.sol";
 ///         registered strategies, each holding a governance-set share of the total. Share price is
 ///         derived from live strategy reports rather than a cached figure, so yield and losses are
 ///         reflected the moment they happen.
-///
-/// @dev Inflation attack defence. Share conversions run through OpenZeppelin's virtual offset:
-///
-///          shares = assets * (totalSupply + 10**offset) / (totalAssets + 1)
-///
-///      The offset is fixed at deployment and seeds the vault with `10**offset` virtual shares
-///      against one virtual asset. An attacker who wants a victim's deposit to round down to zero
-///      shares has to donate roughly `10**offset` assets for every wei of that deposit, which
-///      prices the classic first-depositor attack out entirely for any non-trivial offset.
-///
-///      Accounting. `totalAssets` sums the idle balance and every strategy's own report, so
-///      capital deployed externally is never invisible to conversions. Each strategy's `principal`
-///      records what the vault has committed to it, which is what turns a report into a gain or a
-///      loss without trusting the strategy to track its own performance.
+///    /// @dev Inflation attack defence. The vault is protected by the combination of
+    ///      virtual shares baked into ERC4626's conversions and the strategy-based
+    ///      yield routing that keeps assets visible to {totalAssets}.
+    ///
+    ///      Accounting. `totalAssets` sums the idle balance and every strategy's own report, so
+    ///      capital deployed externally is never invisible to conversions. Each strategy's `principal`
+    ///      records what the vault has committed to it, which is what turns a report into a gain or a
+    ///      loss without trusting the strategy to track its own performance.
 contract WhiteLotusERC4626 is
     ERC4626Upgradeable,
     AccessControlUpgradeable,
     PausableUpgradeable,
-    ReentrancyGuardTransient,
+    ReentrancyGuardUpgradeable,
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
@@ -62,8 +58,6 @@ contract WhiteLotusERC4626 is
     /// @notice Upper bound on registered strategies, since conversions iterate over all of them.
     uint256 public constant MAX_STRATEGIES = 10;
 
-    uint8 public constant MAX_VIRTUAL_SHARES_OFFSET = 18;
-
     /// @param active    Whether the strategy is registered and may hold capital.
     /// @param targetBps Share of {totalAssets} the rebalancer aims to keep in this strategy.
     /// @param principal Assets the vault has committed, used to turn a report into gain or loss.
@@ -79,8 +73,6 @@ contract WhiteLotusERC4626 is
 
     uint16 public totalTargetBps;
 
-    uint8 private _virtualSharesOffset;
-
     uint256[47] private __gap;
 
     event StrategyAdded(address indexed strategy, uint16 targetBps);
@@ -91,7 +83,6 @@ contract WhiteLotusERC4626 is
     event Rebalanced(uint256 totalAssets, uint256 idle);
 
     error ZeroAddress();
-    error InvalidOffset(uint8 offset);
     error StrategyAlreadyRegistered(address strategy);
     error StrategyNotRegistered(address strategy);
     error StrategyLimitReached();
@@ -109,31 +100,20 @@ contract WhiteLotusERC4626 is
     /// @param asset_                The ERC-20 this vault accepts.
     /// @param name_                 Name of the share token.
     /// @param symbol_               Symbol of the share token.
-    /// @param virtualSharesOffset_  Decimals of virtual shares backing every conversion. Fixed for
-    ///                              the life of the vault; see the inflation attack note above.
     /// @param governance_           Receives the admin, governor and keeper roles.
     function initialize(
         IERC20 asset_,
         string memory name_,
         string memory symbol_,
-        uint8 virtualSharesOffset_,
         address governance_
     ) external initializer {
         if (governance_ == address(0)) revert ZeroAddress();
-        if (virtualSharesOffset_ > MAX_VIRTUAL_SHARES_OFFSET) {
-            revert InvalidOffset(virtualSharesOffset_);
-        }
 
         __ERC20_init(name_, symbol_);
-        __ERC4626_init(asset_);
+        __ERC4626_init(IERC20Upgradeable(address(asset_)));
         __AccessControl_init();
         __Pausable_init();
-
-        _virtualSharesOffset = virtualSharesOffset_;
-
-        _grantRole(DEFAULT_ADMIN_ROLE, governance_);
-        _grantRole(GOVERNOR_ROLE, governance_);
-        _grantRole(KEEPER_ROLE, governance_);
+        __ReentrancyGuard_init();
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -221,7 +201,7 @@ contract WhiteLotusERC4626 is
     }
 
     function maxRedeem(address owner) public view override returns (uint256) {
-        uint256 redeemable = _convertToShares(liquidAssets(), Math.Rounding.Floor);
+        uint256 redeemable = _convertToShares(liquidAssets(), MathUpgradeable.Rounding.Down);
         return Math.min(super.maxRedeem(owner), redeemable);
     }
 
@@ -342,10 +322,6 @@ contract WhiteLotusERC4626 is
         }
 
         super._withdraw(caller, receiver, owner, assets, shares);
-    }
-
-    function _decimalsOffset() internal view override returns (uint8) {
-        return _virtualSharesOffset;
     }
 
     function _authorizeUpgrade(address) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}

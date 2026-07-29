@@ -7,7 +7,7 @@ import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from
     "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
-import {Pausable} from "openzeppelin-contracts/contracts/utils/Pausable.sol";
+import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
@@ -24,20 +24,14 @@ import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 ///      │    2. Attacker donates a large amount directly to the vault.          │
 ///      │    3. Next depositor's preview rounds to 0 shares; funds are stolen. │
 ///      │                                                                       │
-///      │  We defend with TWO layered mechanisms:                               │
-///      │                                                                       │
-///      │  A) Virtual Share Offset (_decimalsOffset = 18)                       │
-///      │     OZ's ERC4626 adds `10**_decimalsOffset()` to both numerator and  │
-///      │     denominator of every share↔asset conversion. With an offset of   │
-///      │     18 the virtual pool is 10^18 shares / 10^18 assets, so an        │
-///      │     attacker would need to donate 10^18 tokens (≈1 ETH-scaled unit)  │
-///      │     per wei of victim deposit to grief them — economically absurd.   │
-///      │                                                                       │
-///      │  B) Dead shares on first deposit                                      │
+///      │  We defend with dead shares on first deposit:                         │
 ///      │     The constructor mints DEAD_SHARES to address(1). These shares    │
 ///      │     are permanently locked ("dead"). They ensure totalSupply() > 0   │
 ///      │     from the very first moment, so the share price is always          │
 ///      │     anchored, even before any real user interacts with the vault.     │
+///      │     Combined with OZ's built-in +1 virtual offset, an attacker would  │
+///      │     need to donate ~DEAD_SHARES tokens per wei of victim deposit to   │
+///      │     grief them — economically absurd for DEAD_SHARES=1000.            │
 ///      └───────────────────────────────────────────────────────────────────────┘
 ///
 ///      ┌─ Yield Accrual ───────────────────────────────────────────────────────┐
@@ -94,8 +88,9 @@ contract Vault is ERC4626, Ownable, Pausable {
     constructor(IERC20 asset_, string memory name_, string memory symbol_, address owner_)
         ERC4626(asset_)
         ERC20(name_, symbol_)
-        Ownable(owner_)
+        Ownable()
     {
+        if (owner_ != msg.sender) _transferOwnership(owner_);
         // ── Dead-share seeding ───────────────────────────────────────────────
         // Mint DEAD_SHARES to address(1) (a non-zero address that can never
         // sign transactions on mainnet, making these shares permanently locked).
@@ -106,7 +101,6 @@ contract Vault is ERC4626, Ownable, Pausable {
         // We call _mint() directly because the asset has not yet been deposited —
         // we are creating "empty" dead shares that inflate the denominator of
         // future conversions. Their cost is paid in diluted real assets, but
-        // since DEAD_SHARES is tiny relative to 10**_decimalsOffset() the
         // impact on honest depositors is negligible.
         _mint(address(1), DEAD_SHARES);
         emit DeadSharesMinted(address(1), DEAD_SHARES);
@@ -120,19 +114,6 @@ contract Vault is ERC4626, Ownable, Pausable {
     ///      automatically increases the share price for all holders.
     function totalAssets() public view override returns (uint256) {
         return IERC20(asset()).balanceOf(address(this));
-    }
-
-    /// @dev Overrides the OZ virtual shares offset to 18.
-    ///
-    ///      OpenZeppelin's ERC4626 formulas are:
-    ///        shares = assets * (totalSupply + 10**offset) / (totalAssets + 10**offset)
-    ///        assets = shares * (totalAssets + 10**offset) / (totalSupply + 10**offset)
-    ///
-    ///      With offset=18 the virtual pool starts at 1e18 / 1e18. An attacker
-    ///      would need to donate 1e18 underlying tokens per 1-wei deposit to
-    ///      cause even 1 wei of rounding loss — economically irrational.
-    function _decimalsOffset() internal pure override returns (uint8) {
-        return 18;
     }
 
     // ─── Standard EIP-4626 entry points (with pause guard on deposits) ──────
