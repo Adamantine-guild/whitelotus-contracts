@@ -103,13 +103,21 @@ contract Governance is ERC2771Context {
 
     // ─── Modifiers ──────────────────────────────────────────────────────────
 
-    modifier onlyAdmin() {
+    function _checkAdmin() internal view {
         if (!(_msgSender() == admin)) revert NotAdmin();
+    }
+
+    function _checkValidProposal(uint256 proposalId) internal view {
+        if (!(proposalId > 0 && proposalId <= proposalCount)) revert InvalidProposal();
+    }
+
+    modifier onlyAdmin() {
+        _checkAdmin();
         _;
     }
 
     modifier validProposal(uint256 proposalId) {
-        if (!(proposalId > 0 && proposalId <= proposalCount)) revert InvalidProposal();
+        _checkValidProposal(proposalId);
         _;
     }
 

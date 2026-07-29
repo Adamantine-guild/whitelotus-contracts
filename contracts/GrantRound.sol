@@ -54,8 +54,16 @@ contract GrantRound is ERC2771Context {
     /// @dev Emergency stop switch (#1). When set, fund-in operations revert.
     bool public paused;
 
-    modifier onlyAdmin() {
+    function _checkAdmin() internal view {
         if (!(_msgSender() == admin)) revert NotAdmin();
+    }
+
+    function _checkWhenNotPaused() internal view {
+        if (!(!paused)) revert ContractPaused();
+    }
+
+    modifier onlyAdmin() {
+        _checkAdmin();
         _;
     }
 
@@ -67,7 +75,7 @@ contract GrantRound is ERC2771Context {
     }
 
     modifier whenNotPaused() {
-        if (!(!paused)) revert ContractPaused();
+        _checkWhenNotPaused();
         _;
     }
 
