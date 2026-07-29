@@ -32,7 +32,7 @@ contract Deploy is Script {
         console.log("Deployer :", deployer);
         console.log("Admin    :", admin);
         if (admin != deployer && admin.code.length > 0) {
-            console.log("           (contract – multi-sig upgrade enforcement active)");
+            console.log("           (contract - multi-sig upgrade enforcement active)");
         }
         console.log("");
 

@@ -250,6 +250,8 @@ contract Vault is ERC4626, Ownable, Pausable, ReentrancyGuard {
     /// @param token The ERC-20 token to sweep.
     function sweepFees(address token) external onlyTreasuryOrOwner {
         uint256 amount = IERC20(token).balanceOf(address(this));
+        // Exact zero means there is nothing to sweep.
+        // slither-disable-next-line incorrect-equality
         if (amount == 0) revert NoFeesToSweep();
         totalFeesSwept += amount;
         SafeERC20.safeTransfer(IERC20(token), treasury, amount);

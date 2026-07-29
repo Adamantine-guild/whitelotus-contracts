@@ -5,6 +5,20 @@ pragma solidity ^0.8.24;
 import {IDiamondCut} from "../interfaces/IDiamondCut.sol";
 
 library LibDiamond {
+    error MustBeContractOwner();
+    error ZeroAddFacetAddress();
+    error FunctionAlreadyExists();
+    error ZeroReplaceFacetAddress();
+    error FunctionDoesNotExist();
+    error CannotReplaceFunctionWithSameFunction();
+    error NonzeroRemoveFacetAddress();
+    error FunctionDoesNotExistForRemoval();
+    error InitAddressZeroWithNonemptyCalldata();
+    error InitAddressNonzeroWithEmptyCalldata();
+    error InitAddressHasNoCode();
+    error IncorrectAction();
+    error InitFunctionReverted();
+
     bytes32 internal constant DIAMOND_STORAGE_POSITION = keccak256("diamond.standard.diamond.storage");
 
     struct FacetAddressAndSelectorPosition {
@@ -110,7 +124,9 @@ library LibDiamond {
             bytes4 selector = _functionSelectors[selectorIndex];
             FacetAddressAndSelectorPosition memory oldFacetAddressAndSelectorPosition =
                 ds.facetAddressAndSelectorPosition[selector];
-            if (!(oldFacetAddressAndSelectorPosition.facetAddress != address(0))) revert FunctionDoesNotExistForRemoval();
+            if (!(oldFacetAddressAndSelectorPosition.facetAddress != address(0))) {
+                revert FunctionDoesNotExistForRemoval();
+            }
 
             // replace selector with last selector
             selectorCount--;

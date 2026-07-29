@@ -301,6 +301,8 @@ contract TWAPOracle is Ownable {
     ) private view returns (uint256) {
         Observation memory last = _observations[pool][state.index];
 
+        // Exact zero means return the current cumulative without lookback.
+        // slither-disable-next-line incorrect-equality
         if (secondsAgo == 0) {
             uint32 age = timestamp - last.blockTimestamp;
             if (age > maxObservationGap) revert SparseObservations(pool, age, maxObservationGap);
@@ -313,7 +315,10 @@ contract TWAPOracle is Ownable {
         (Observation memory beforeOrAt, Observation memory atOrAfter) =
             _surroundingObservations(pool, state, last, target, timestamp, secondsAgo);
 
+        // Exact timestamp match means no interpolation is required.
+        // slither-disable-next-line incorrect-equality
         if (target == beforeOrAt.blockTimestamp) return beforeOrAt.logPriceCumulative;
+        // slither-disable-next-line incorrect-equality
         if (target == atOrAfter.blockTimestamp) return atOrAfter.logPriceCumulative;
 
         uint32 gap = atOrAfter.blockTimestamp - beforeOrAt.blockTimestamp;

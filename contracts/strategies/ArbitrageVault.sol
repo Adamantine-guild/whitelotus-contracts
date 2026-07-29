@@ -5,7 +5,6 @@ pragma solidity ^0.8.24;
 import {Vault} from "../Vault.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {IERC3156FlashBorrower} from "../interfaces/IERC3156FlashBorrower.sol";
 
 interface IERC3156FlashLender {
@@ -19,6 +18,14 @@ interface IERC3156FlashLender {
 
 contract ArbitrageVault is Vault, IERC3156FlashBorrower {
     using SafeERC20 for IERC20;
+
+    error ZeroAddress();
+    error UnauthorizedCaller();
+    error UntrustedLender();
+    error UnauthorizedInitiator();
+    error InsufficientBalanceForRepayment();
+    error SwapStepFailed();
+
     // ─── Structs ────────────────────────────────────────────────────────────
 
     struct SwapStep {
