@@ -56,6 +56,8 @@ contract CDPEngine is Ownable {
     // collateral => user => position
     mapping(address => mapping(address => Position)) public positions;
 
+    address public liquidatorRole;
+
     // ─── Events ─────────────────────────────────────────────────────────────
 
     event CollateralWhitelisted(
@@ -108,6 +110,10 @@ contract CDPEngine is Ownable {
 
         priceFeeds[token] = priceFeed;
         emit PriceFeedSet(token, priceFeed);
+    }
+
+    function setLiquidatorRole(address _liquidator) external onlyOwner {
+        liquidatorRole = _liquidator;
     }
 
     // ─── Collateral Operations ──────────────────────────────────────────────
@@ -177,21 +183,25 @@ contract CDPEngine is Ownable {
 
     // ─── Liquidation ────────────────────────────────────────────────────────
 
-    function liquidate(address collateralType, address user, uint256 debtToCover) external {
+    function liquidate(
+        address collateralType, 
+        address user, 
+        uint256 debtToCover,
+        uint256 appliedPenalty
+    ) external {
+        require(msg.sender == liquidatorRole, "CDPEngine: Only liquidator");
         require(
             collateralConfigs[collateralType].whitelisted, "CDPEngine: Collateral not whitelisted"
         );
         Position storage pos = positions[collateralType][user];
 
-        require(!isPositionSafe(collateralType, user), "CDPEngine: Position is safe");
         require(debtToCover > 0, "CDPEngine: Zero debt to cover");
         require(pos.debt >= debtToCover, "CDPEngine: Cover exceeds debt");
 
-        CollateralConfig memory config = collateralConfigs[collateralType];
         uint256 price = getNormalizedPrice(collateralType);
 
-        // Seized collateral value in USD (with penalty applied, e.g. 1.1 * debtToCover)
-        uint256 collateralValueToSeize = (debtToCover * config.liquidationPenalty) / 1e18;
+        // Seized collateral value in USD (with penalty applied)
+        uint256 collateralValueToSeize = (debtToCover * appliedPenalty) / 1e18;
 
         // Seized collateral amount (normalized to 18 decimals)
         // Amount = Value / Price

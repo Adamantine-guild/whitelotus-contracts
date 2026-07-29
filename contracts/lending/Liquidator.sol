@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {CDPEngine} from "./CDPEngine.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {OracleReader} from "./OracleReader.sol";
 
 /**
  * @title Liquidator
@@ -15,6 +16,18 @@ contract Liquidator {
 
     CDPEngine public immutable cdpEngine;
     IERC20 public immutable stablecoin;
+
+    // Partial liquidation cap: Max 50% of the debt can be liquidated at once
+    uint256 public constant MAX_LIQUIDATION_PORTION = 0.5e18; // 50%
+
+    // Configurable penalty tiers
+    uint256 public tier1Threshold = 0.95e18;
+    uint256 public tier1Penalty = 1.05e18;
+
+    uint256 public tier2Threshold = 0.90e18;
+    uint256 public tier2Penalty = 1.10e18;
+
+    uint256 public tier3Penalty = 1.15e18;
 
     event LiquidationExecuted(
         address indexed collateralType,
@@ -38,6 +51,25 @@ contract Liquidator {
      * @param debtToCover The amount of debt to cover.
      */
     function liquidatePosition(address collateralType, address user, uint256 debtToCover) external {
+        // Enforce partial liquidation cap
+        (, uint256 debt) = cdpEngine.positions(collateralType, user);
+        uint256 maxLiquidatable = (debt * MAX_LIQUIDATION_PORTION) / 1e18;
+        require(debtToCover <= maxLiquidatable, "Liquidator: Exceeds partial liquidation cap");
+
+        // Validate borrower health factor via OracleReader
+        uint256 healthFactor = OracleReader.getHealthFactor(cdpEngine, collateralType, user);
+        require(healthFactor < 1e18, "Liquidator: Position is safe");
+
+        // Calculate liquidator reward bonus accurately based on configurable liquidation penalty tiers
+        uint256 appliedPenalty;
+        if (healthFactor >= tier1Threshold) {
+            appliedPenalty = tier1Penalty;
+        } else if (healthFactor >= tier2Threshold) {
+            appliedPenalty = tier2Penalty;
+        } else {
+            appliedPenalty = tier3Penalty;
+        }
+
         // Transfer stablecoin from caller to this contract
         stablecoin.safeTransferFrom(msg.sender, address(this), debtToCover);
 
@@ -47,8 +79,8 @@ contract Liquidator {
         // Get collateral balance before
         uint256 balanceBefore = IERC20(collateralType).balanceOf(address(this));
 
-        // Call liquidate on CDPEngine
-        cdpEngine.liquidate(collateralType, user, debtToCover);
+        // Call liquidate on CDPEngine (now accepts penalty)
+        cdpEngine.liquidate(collateralType, user, debtToCover, appliedPenalty);
 
         // Calculate collateral seized
         uint256 balanceAfter = IERC20(collateralType).balanceOf(address(this));
