@@ -249,11 +249,7 @@ contract GovernanceTimelockTest is Test {
 
         // Schedule with delay below 48 hours.
         vm.prank(admin);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                TimelockController.TimelockInsufficientDelay.selector, MIN_DELAY - 1, MIN_DELAY
-            )
-        );
+        vm.expectRevert("TimelockController: insufficient delay");
         timelock.schedule(address(gov), 0, data, bytes32(0), salt, MIN_DELAY - 1);
     }
 
@@ -271,13 +267,7 @@ contract GovernanceTimelockTest is Test {
         bytes32 salt = keccak256("salt");
 
         vm.prank(admin);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                TimelockController.TimelockUnexpectedOperationState.selector,
-                opId,
-                bytes32(uint256(1) << uint256(uint8(TimelockController.OperationState.Ready)))
-            )
-        );
+        vm.expectRevert("TimelockController: operation is not ready");
         timelock.execute(address(gov), 0, data, bytes32(0), salt);
     }
 
@@ -305,13 +295,7 @@ contract GovernanceTimelockTest is Test {
 
         vm.warp(block.timestamp + MIN_DELAY + 1);
         vm.prank(admin);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                TimelockController.TimelockUnexpectedOperationState.selector,
-                opId,
-                bytes32(uint256(1) << uint256(uint8(TimelockController.OperationState.Ready)))
-            )
-        );
+        vm.expectRevert("TimelockController: operation is not ready");
         timelock.execute(address(gov), 0, data, bytes32(0), salt);
     }
 
@@ -339,13 +323,7 @@ contract GovernanceTimelockTest is Test {
         bytes32 salt = keccak256("salt");
 
         vm.prank(admin);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                TimelockController.TimelockUnexpectedOperationState.selector,
-                opId,
-                bytes32(uint256(1) << uint256(uint8(TimelockController.OperationState.Ready)))
-            )
-        );
+        vm.expectRevert("TimelockController: operation is not ready");
         timelock.execute(address(gov), 0, data, bytes32(0), salt);
     }
 

@@ -85,7 +85,8 @@ contract TWAPOracle is Ownable {
     /// @param _targetWindow      Lookback window the buffer should be able to serve, in seconds.
     /// @param _maxObservationGap Longest tolerated gap between consecutive checkpoints, in seconds.
     /// @param owner_             Address allowed to register pools and update configuration.
-    constructor(uint32 _targetWindow, uint32 _maxObservationGap, address owner_) Ownable(owner_) {
+    constructor(uint32 _targetWindow, uint32 _maxObservationGap, address owner_) Ownable() {
+        if (owner_ != msg.sender) _transferOwnership(owner_);
         _setConfig(_targetWindow, _maxObservationGap);
     }
 

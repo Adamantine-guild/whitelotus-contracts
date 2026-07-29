@@ -14,7 +14,8 @@ contract StakingLogic is BaseLogic {
     }
 
     function initialize(address initialOwner) initializer public {
-        __Ownable_init(initialOwner);
+        __Ownable_init();
+        if (initialOwner != msg.sender) _transferOwnership(initialOwner);
     }
 
     function stake(uint256 amount) external {

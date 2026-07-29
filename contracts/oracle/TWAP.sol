@@ -145,7 +145,8 @@ contract TWAP is Ownable {
     /// @param _minUpdateInterval Minimum seconds between consecutive observation writes.
     /// @param _defaultWindow     Default TWAP lookback window in seconds (e.g., 1800 for 30 min).
     /// @param _owner             Address that can manage config and authorizations.
-    constructor(uint32 _minUpdateInterval, uint32 _defaultWindow, address _owner) Ownable(_owner) {
+    constructor(uint32 _minUpdateInterval, uint32 _defaultWindow, address _owner) Ownable() {
+        if (_owner != msg.sender) _transferOwnership(_owner);
         require(_minUpdateInterval > 0, "TWAP: zero min update interval");
         require(_defaultWindow >= _minUpdateInterval, "TWAP: window < interval");
         minUpdateInterval = _minUpdateInterval;
