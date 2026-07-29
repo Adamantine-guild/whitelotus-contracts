@@ -52,8 +52,9 @@ contract Governance is ERC2771Context {
 
     // ─── State ──────────────────────────────────────────────────────────────
 
-    /// @dev Admin who creates proposals.
-    address public immutable admin;
+    /// @dev Admin who creates proposals. Can be transferred (e.g. to a TimelockController)
+    ///      to enforce a delay before proposal creation.
+    address public admin;
 
     /// @dev ERC-20 token whose balanceOf() determines each voter's weight at commit time.
     IERC20 public immutable votingToken;
@@ -98,6 +99,7 @@ contract Governance is ERC2771Context {
     event ProposalTallied(
         uint256 indexed proposalId, uint256 forVotes, uint256 againstVotes, uint256 abstainVotes
     );
+    event AdminUpdated(address indexed previousAdmin, address indexed newAdmin);
 
     // ─── Modifiers ──────────────────────────────────────────────────────────
 
@@ -119,6 +121,19 @@ contract Governance is ERC2771Context {
         if (!(_votingToken != address(0))) revert ZeroToken();
         admin = msg.sender;
         votingToken = IERC20(_votingToken);
+    }
+
+    // ─── Admin management ───────────────────────────────────────────────────
+
+    /// @notice Transfer the admin role to a new address.
+    /// @dev Only callable by the current admin. Intended to hand authority to a
+    ///      TimelockController so that proposal creation enforces a mandatory delay.
+    /// @param newAdmin Address that will be able to call createProposal()
+    function updateAdmin(address newAdmin) external onlyAdmin {
+        require(newAdmin != address(0), "Zero admin");
+        require(newAdmin != admin, "Same admin");
+        emit AdminUpdated(admin, newAdmin);
+        admin = newAdmin;
     }
 
     // ─── Phase 0: Proposal creation ─────────────────────────────────────────

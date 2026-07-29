@@ -74,6 +74,8 @@ contract CDPEngine is Ownable {
     // collateral => user => position
     mapping(address => mapping(address => Position)) public positions;
 
+    address public liquidatorRole;
+
     // ─── Events ─────────────────────────────────────────────────────────────
 
     event CollateralWhitelisted(
@@ -126,6 +128,10 @@ contract CDPEngine is Ownable {
 
         priceFeeds[token] = priceFeed;
         emit PriceFeedSet(token, priceFeed);
+    }
+
+    function setLiquidatorRole(address _liquidator) external onlyOwner {
+        liquidatorRole = _liquidator;
     }
 
     // ─── Collateral Operations ──────────────────────────────────────────────
@@ -196,11 +202,10 @@ contract CDPEngine is Ownable {
         if (!(debtToCover > 0)) revert ZeroDebtToCover();
         if (!(pos.debt >= debtToCover)) revert CoverExceedsDebt();
 
-        CollateralConfig memory config = collateralConfigs[collateralType];
         uint256 price = getNormalizedPrice(collateralType);
 
-        // Seized collateral value in USD (with penalty applied, e.g. 1.1 * debtToCover)
-        uint256 collateralValueToSeize = (debtToCover * config.liquidationPenalty) / 1e18;
+        // Seized collateral value in USD (with penalty applied)
+        uint256 collateralValueToSeize = (debtToCover * appliedPenalty) / 1e18;
 
         // Seized collateral amount (normalized to 18 decimals)
         // Amount = Value / Price
