@@ -96,7 +96,7 @@ contract FlashLenderTest is Test {
         token.mint(address(borrower), lender.flashFee(address(token), amount));
         borrower.configure(false, false, true);
 
-        vm.expectRevert(abi.encodeWithSignature("ReentrancyGuardReentrantCall()"));
+        vm.expectRevert(bytes("ReentrancyGuard: reentrant call"));
         lender.flashLoan(borrower, address(token), amount, "");
     }
 
