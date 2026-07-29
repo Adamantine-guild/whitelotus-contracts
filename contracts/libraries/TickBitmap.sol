@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 import "./BitMath.sol";
 
 /// @title TickBitmap - O(1) bitwise tick lookup for concentrated liquidity
@@ -19,6 +20,8 @@ import "./BitMath.sol";
 ///      │   compressed = tick / tickSpacing                              │
 ///      └─────────────────────────────────────────────────────────────────┘
 library TickBitmap {
+    error TickNotAligned();
+
     /// @notice Position of a tick in the bitmap: word index and bit position within word
     struct Position {
         int16 wordPos;
@@ -55,7 +58,7 @@ library TickBitmap {
         int24 tick,
         int24 tickSpacing
     ) internal {
-        require(tick % tickSpacing == 0, "TickBitmap: tick not aligned");
+        if (!(tick % tickSpacing == 0)) revert TickNotAligned();
         int24 compressed = tick / tickSpacing;
         Position memory pos = position(compressed);
         uint256 mask = 1 << pos.bitPos;
@@ -72,7 +75,7 @@ library TickBitmap {
         int24 tick,
         int24 tickSpacing
     ) internal view returns (bool) {
-        require(tick % tickSpacing == 0, "TickBitmap: tick not aligned");
+        if (!(tick % tickSpacing == 0)) revert TickNotAligned();
         int24 compressed = tick / tickSpacing;
         Position memory pos = position(compressed);
         return (self[pos.wordPos] & (1 << pos.bitPos)) != 0;

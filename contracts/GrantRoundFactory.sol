@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 import {GrantRound} from "./GrantRound.sol";
 
 /// @title GrantRoundFactory - Minimal factory to deploy simple grant rounds
@@ -8,6 +9,9 @@ import {GrantRound} from "./GrantRound.sol";
 ///         so that every round created through this factory can participate in
 ///         sponsored / gasless meta-transactions out of the box.
 contract GrantRoundFactory {
+    error ZeroForwarder();
+    error FundingFailed();
+
     event RoundCreated(
         address indexed round,
         address indexed admin,
@@ -24,7 +28,7 @@ contract GrantRoundFactory {
     /// @param _trustedForwarder Address of the EIP-712 MinimalForwarder (or any ERC-2771
     ///        compatible forwarder).  Must be non-zero.
     constructor(address _trustedForwarder) {
-        require(_trustedForwarder != address(0), "Factory: zero forwarder");
+        if (!(_trustedForwarder != address(0))) revert ZeroForwarder();
         trustedForwarder = _trustedForwarder;
     }
 
@@ -48,7 +52,7 @@ contract GrantRoundFactory {
         if (msg.value > 0) {
             // optional initial funding
             (bool ok,) = round.call{value: msg.value}("");
-            require(ok, "funding failed");
+            if (!(ok)) revert FundingFailed();
         }
 
         emit RoundCreated(round, _admin, title, metadataURI, budget);

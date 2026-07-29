@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 import {ERC2771Context} from "./ERC2771Context.sol";
 
 /// @title IERC20 - Minimal ERC20 interface for voting-power queries
@@ -23,6 +24,23 @@ interface IERC20 {
 ///      original signer, so voting power and receipt tracking are tied to the voter, not
 ///      the relayer.
 contract Governance is ERC2771Context {
+    error NotAdmin();
+    error InvalidProposal();
+    error ZeroToken();
+    error EmptyDescription();
+    error ZeroDuration();
+    error CommitPhaseEnded();
+    error ZeroHash();
+    error AlreadyCommitted();
+    error NoVotingPower();
+    error CommitPhaseActive();
+    error RevealPhaseEnded();
+    error NoCommitment();
+    error AlreadyRevealed();
+    error CommitMismatch();
+    error RevealPhaseActive();
+    error AlreadyTallied();
+
     // ─── Types ──────────────────────────────────────────────────────────────
 
     /// @dev Vote options.  Against defaults to 0, matching the enum's default value.
@@ -34,8 +52,9 @@ contract Governance is ERC2771Context {
 
     // ─── State ──────────────────────────────────────────────────────────────
 
-    /// @dev Admin who creates proposals.
-    address public immutable admin;
+    /// @dev Admin who creates proposals. Can be transferred (e.g. to a TimelockController)
+    ///      to enforce a delay before proposal creation.
+    address public admin;
 
     /// @dev ERC-20 token whose balanceOf() determines each voter's weight at commit time.
     IERC20 public immutable votingToken;
@@ -80,16 +99,17 @@ contract Governance is ERC2771Context {
     event ProposalTallied(
         uint256 indexed proposalId, uint256 forVotes, uint256 againstVotes, uint256 abstainVotes
     );
+    event AdminUpdated(address indexed previousAdmin, address indexed newAdmin);
 
     // ─── Modifiers ──────────────────────────────────────────────────────────
 
     modifier onlyAdmin() {
-        require(_msgSender() == admin, "Not admin");
+        if (!(_msgSender() == admin)) revert NotAdmin();
         _;
     }
 
     modifier validProposal(uint256 proposalId) {
-        require(proposalId > 0 && proposalId <= proposalCount, "Invalid proposal");
+        if (!(proposalId > 0 && proposalId <= proposalCount)) revert InvalidProposal();
         _;
     }
 
@@ -98,9 +118,22 @@ contract Governance is ERC2771Context {
     /// @param _votingToken ERC-20 token used to derive each voter's weight via balanceOf()
     /// @param _trustedForwarder ERC-2771 forwarder address; enables gasless voting via relayers.
     constructor(address _votingToken, address _trustedForwarder) ERC2771Context(_trustedForwarder) {
-        require(_votingToken != address(0), "Zero token");
+        if (!(_votingToken != address(0))) revert ZeroToken();
         admin = msg.sender;
         votingToken = IERC20(_votingToken);
+    }
+
+    // ─── Admin management ───────────────────────────────────────────────────
+
+    /// @notice Transfer the admin role to a new address.
+    /// @dev Only callable by the current admin. Intended to hand authority to a
+    ///      TimelockController so that proposal creation enforces a mandatory delay.
+    /// @param newAdmin Address that will be able to call createProposal()
+    function updateAdmin(address newAdmin) external onlyAdmin {
+        require(newAdmin != address(0), "Zero admin");
+        require(newAdmin != admin, "Same admin");
+        emit AdminUpdated(admin, newAdmin);
+        admin = newAdmin;
     }
 
     // ─── Phase 0: Proposal creation ─────────────────────────────────────────
@@ -116,8 +149,8 @@ contract Governance is ERC2771Context {
         uint256 commitDuration,
         uint256 revealDuration
     ) external onlyAdmin returns (uint256 proposalId) {
-        require(bytes(description).length > 0, "Empty description");
-        require(commitDuration > 0 && revealDuration > 0, "Zero duration");
+        if (!(bytes(description).length > 0)) revert EmptyDescription();
+        if (!(commitDuration > 0 && revealDuration > 0)) revert ZeroDuration();
 
         proposalId = ++proposalCount;
         uint256 commitEnd = block.timestamp + commitDuration;
@@ -141,16 +174,16 @@ contract Governance is ERC2771Context {
     /// @param voteHash The commitment hash
     function commitVote(uint256 proposalId, bytes32 voteHash) external validProposal(proposalId) {
         Proposal storage p = proposals[proposalId];
-        require(block.timestamp <= p.commitDeadline, "Commit phase ended");
-        require(voteHash != bytes32(0), "Zero hash");
+        if (!(block.timestamp <= p.commitDeadline)) revert CommitPhaseEnded();
+        if (!(voteHash != bytes32(0))) revert ZeroHash();
 
         address voter = _msgSender();
         VoterReceipt storage r = receipts[proposalId][voter];
-        require(!r.committed, "Already committed");
+        if (!(!r.committed)) revert AlreadyCommitted();
 
         r.commitHash = voteHash;
         r.weight = votingToken.balanceOf(voter);
-        require(r.weight > 0, "No voting power");
+        if (!(r.weight > 0)) revert NoVotingPower();
         r.committed = true;
 
         _voterList[proposalId].push(voter);
@@ -170,15 +203,15 @@ contract Governance is ERC2771Context {
         validProposal(proposalId)
     {
         Proposal storage p = proposals[proposalId];
-        require(block.timestamp > p.commitDeadline, "Commit phase active");
-        require(block.timestamp <= p.revealDeadline, "Reveal phase ended");
+        if (!(block.timestamp > p.commitDeadline)) revert CommitPhaseActive();
+        if (!(block.timestamp <= p.revealDeadline)) revert RevealPhaseEnded();
 
         address voter = _msgSender();
         VoterReceipt storage r = receipts[proposalId][voter];
-        require(r.committed, "No commitment");
-        require(!r.revealed, "Already revealed");
+        if (!(r.committed)) revert NoCommitment();
+        if (!(!r.revealed)) revert AlreadyRevealed();
 
-        require(keccak256(abi.encodePacked(vote, salt)) == r.commitHash, "Commit mismatch");
+        if (!(keccak256(abi.encodePacked(vote, salt)) == r.commitHash)) revert CommitMismatch();
 
         r.vote = vote;
         r.revealed = true;
@@ -203,8 +236,8 @@ contract Governance is ERC2771Context {
     /// @param proposalId Target proposal
     function tallyVotes(uint256 proposalId) external validProposal(proposalId) {
         Proposal storage p = proposals[proposalId];
-        require(block.timestamp > p.revealDeadline, "Reveal phase active");
-        require(!p.tallied, "Already tallied");
+        if (!(block.timestamp > p.revealDeadline)) revert RevealPhaseActive();
+        if (!(!p.tallied)) revert AlreadyTallied();
 
         p.tallied = true;
 

@@ -16,14 +16,24 @@ import {MinimalForwarder} from "../contracts/MinimalForwarder.sol";
 ///     --broadcast --verify \
 ///     --etherscan-api-key $ETHERSCAN_API_KEY \
 ///     -vvvv
+///
+///   For multi-sig deployments, set SAFE_ADDRESS to a Gnosis Safe.  The Safe becomes the
+///   admin / owner of all deployed contracts, so upgrades require multi-sig approval.
+///   If SAFE_ADDRESS is omitted the script falls back to ADMIN_ADDRESS, then the deployer.
 contract Deploy is Script {
     function run() external {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
-        address admin = vm.envOr("ADMIN_ADDRESS", vm.addr(deployerKey));
+        address deployer = vm.addr(deployerKey);
+
+        // Prefer Gnosis Safe → ADMIN_ADDRESS → deployer
+        address admin = vm.envOr("SAFE_ADDRESS", vm.envOr("ADMIN_ADDRESS", deployer));
 
         console.log("=== WhiteLotus Deployment ===");
-        console.log("Deployer :", vm.addr(deployerKey));
+        console.log("Deployer :", deployer);
         console.log("Admin    :", admin);
+        if (admin != deployer && admin.code.length > 0) {
+            console.log("           (contract – multi-sig upgrade enforcement active)");
+        }
         console.log("");
 
         vm.startBroadcast(deployerKey);
@@ -87,6 +97,13 @@ contract Deploy is Script {
         console.log("GrantRoundFactory:", address(factory));
         console.log("Total rounds     :", factory.roundsCount());
         console.log("StakingLogic Proxy:", address(stakingProxy));
+
+        if (admin.code.length > 0) {
+            console.log("Admin is a contract – multi-sig upgrade enforcement active.");
+        } else {
+            console.log("WARNING: Admin is an EOA.");
+            console.log("  Run `npx hardhat run scripts/transferAdmin.ts` to hand off to a Safe.");
+        }
     }
 }
 

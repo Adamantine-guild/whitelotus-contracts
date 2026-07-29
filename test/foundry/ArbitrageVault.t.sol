@@ -129,7 +129,7 @@ contract ArbitrageVaultTest is Test {
 
         // Call from unapproved lender directly to callback
         vm.prank(address(0xBAD));
-        vm.expectRevert("ArbitrageVault: Untrusted lender");
+        vm.expectRevert(ArbitrageVault.UntrustedLender.selector);
         vault.onFlashLoan(address(vault), address(token), 1000, 10, data);
     }
 
@@ -139,7 +139,7 @@ contract ArbitrageVaultTest is Test {
 
         // Call callback with initiator != address(vault)
         vm.prank(address(lender));
-        vm.expectRevert("ArbitrageVault: Unauthorized initiator");
+        vm.expectRevert(ArbitrageVault.UnauthorizedInitiator.selector);
         vault.onFlashLoan(address(0xBAD), address(token), 1000, 10, data);
     }
 
@@ -149,7 +149,7 @@ contract ArbitrageVaultTest is Test {
 
         // Attempt to initiate flashloan by standard unprivileged user
         vm.prank(user);
-        vm.expectRevert("ArbitrageVault: Unauthorized caller");
+        vm.expectRevert(ArbitrageVault.UnauthorizedCaller.selector);
         vault.initiateFlashLoan(address(lender), address(token), 1000, data);
     }
 
@@ -165,7 +165,7 @@ contract ArbitrageVaultTest is Test {
         bytes memory data = abi.encode(steps);
 
         vm.prank(keeper);
-        vm.expectRevert(abi.encodeWithSignature("ReentrancyGuardReentrantCall()"));
+        vm.expectRevert(bytes("ReentrancyGuard: reentrant call"));
         vault.initiateFlashLoan(address(lender), address(token), 1000, data);
     }
 }

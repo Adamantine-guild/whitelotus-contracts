@@ -1,10 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract OptimisticOracle {
+    error ZeroBondToken();
+    error ZeroArbitrator();
+    error ZeroAsset();
+    error ZeroPrice();
+    error ProposalDoesNotExist();
+    error AssetMismatch();
+    error AlreadyDisputed();
+    error AlreadyResolved();
+    error ChallengeWindowPassed();
+    error ProposalIsDisputed();
+    error ChallengeWindowNotClosed();
+    error OnlyArbitratorCanResolve();
+    error ProposalNotDisputed();
+    error OnlyArbitratorCanChangeArbitrator();
+
     using SafeERC20 for IERC20;
 
     // ─── Structs ────────────────────────────────────────────────────────────
@@ -59,8 +75,8 @@ contract OptimisticOracle {
         uint256 _challengeWindow,
         address _arbitrator
     ) {
-        require(address(_bondToken) != address(0), "OptimisticOracle: Zero bond token");
-        require(_arbitrator != address(0), "OptimisticOracle: Zero arbitrator");
+        if (!(address(_bondToken) != address(0))) revert ZeroBondToken();
+        if (!(_arbitrator != address(0))) revert ZeroArbitrator();
         bondToken = _bondToken;
         bondAmount = _bondAmount;
         challengeWindow = _challengeWindow;
@@ -70,8 +86,8 @@ contract OptimisticOracle {
     // ─── Proposal ───────────────────────────────────────────────────────────
 
     function proposePrice(address asset, uint256 price) external returns (uint256 proposalId) {
-        require(asset != address(0), "OptimisticOracle: Zero asset");
-        require(price > 0, "OptimisticOracle: Zero price");
+        if (!(asset != address(0))) revert ZeroAsset();
+        if (!(price > 0)) revert ZeroPrice();
 
         proposalId = nextProposalId++;
 
@@ -96,14 +112,11 @@ contract OptimisticOracle {
 
     function disputePrice(address asset, uint256 proposalId) external {
         Proposal storage proposal = proposals[proposalId];
-        require(proposal.proposer != address(0), "OptimisticOracle: Proposal does not exist");
-        require(proposal.asset == asset, "OptimisticOracle: Asset mismatch");
-        require(!proposal.disputed, "OptimisticOracle: Already disputed");
-        require(!proposal.resolved, "OptimisticOracle: Already resolved");
-        require(
-            block.timestamp <= proposal.timestamp + challengeWindow,
-            "OptimisticOracle: Challenge window passed"
-        );
+        if (!(proposal.proposer != address(0))) revert ProposalDoesNotExist();
+        if (!(proposal.asset == asset)) revert AssetMismatch();
+        if (!(!proposal.disputed)) revert AlreadyDisputed();
+        if (!(!proposal.resolved)) revert AlreadyResolved();
+        if (!(block.timestamp <= proposal.timestamp + challengeWindow)) revert ChallengeWindowPassed();
 
         // Pull bond from disputer
         bondToken.safeTransferFrom(msg.sender, address(this), bondAmount);
@@ -118,13 +131,10 @@ contract OptimisticOracle {
 
     function settle(uint256 proposalId) external {
         Proposal storage proposal = proposals[proposalId];
-        require(proposal.proposer != address(0), "OptimisticOracle: Proposal does not exist");
-        require(!proposal.resolved, "OptimisticOracle: Already resolved");
-        require(!proposal.disputed, "OptimisticOracle: Proposal is disputed");
-        require(
-            block.timestamp > proposal.timestamp + challengeWindow,
-            "OptimisticOracle: Challenge window not closed"
-        );
+        if (!(proposal.proposer != address(0))) revert ProposalDoesNotExist();
+        if (!(!proposal.resolved)) revert AlreadyResolved();
+        if (!(!proposal.disputed)) revert ProposalIsDisputed();
+        if (!(block.timestamp > proposal.timestamp + challengeWindow)) revert ChallengeWindowNotClosed();
 
         proposal.resolved = true;
         proposal.proposalValid = true;
@@ -144,11 +154,11 @@ contract OptimisticOracle {
     // ─── Arbitration ────────────────────────────────────────────────────────
 
     function resolveDispute(uint256 proposalId, bool proposalValid) external {
-        require(msg.sender == arbitrator, "OptimisticOracle: Only arbitrator can resolve");
+        if (!(msg.sender == arbitrator)) revert OnlyArbitratorCanResolve();
         Proposal storage proposal = proposals[proposalId];
-        require(proposal.proposer != address(0), "OptimisticOracle: Proposal does not exist");
-        require(proposal.disputed, "OptimisticOracle: Proposal not disputed");
-        require(!proposal.resolved, "OptimisticOracle: Already resolved");
+        if (!(proposal.proposer != address(0))) revert ProposalDoesNotExist();
+        if (!(proposal.disputed)) revert ProposalNotDisputed();
+        if (!(!proposal.resolved)) revert AlreadyResolved();
 
         proposal.resolved = true;
         proposal.proposalValid = proposalValid;
@@ -173,8 +183,8 @@ contract OptimisticOracle {
     // ─── Admin ──────────────────────────────────────────────────────────────
 
     function setArbitrator(address _arbitrator) external {
-        require(msg.sender == arbitrator, "OptimisticOracle: Only arbitrator can change arbitrator");
-        require(_arbitrator != address(0), "OptimisticOracle: Zero arbitrator");
+        if (!(msg.sender == arbitrator)) revert OnlyArbitratorCanChangeArbitrator();
+        if (!(_arbitrator != address(0))) revert ZeroArbitrator();
         arbitrator = _arbitrator;
         emit ArbitratorSet(_arbitrator);
     }

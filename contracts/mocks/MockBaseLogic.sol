@@ -2,7 +2,6 @@
 pragma solidity ^0.8.24;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {Initializable} from "openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 
 // Simulates BaseLogic before any variables are added
 abstract contract MockBaseLogicV1 is Initializable {

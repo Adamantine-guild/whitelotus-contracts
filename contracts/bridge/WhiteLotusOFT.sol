@@ -2,9 +2,10 @@
 pragma solidity ^0.8.24;
 
 import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import {ERC20Permit} from "openzeppelin-contracts/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {LZAdapter} from "./LZAdapter.sol";
 
-contract WhiteLotusOFT is ERC20, LZAdapter {
+contract WhiteLotusOFT is ERC20Permit, LZAdapter {
     error InvalidRecipient();
     error InvalidAmount();
 
@@ -19,7 +20,7 @@ contract WhiteLotusOFT is ERC20, LZAdapter {
         address endpoint_,
         address owner_,
         uint256 initialSupply
-    ) ERC20(name_, symbol_) LZAdapter(endpoint_, owner_) {
+    ) ERC20(name_, symbol_) ERC20Permit(name_) LZAdapter(endpoint_, owner_) {
         _mint(owner_, initialSupply);
     }
 

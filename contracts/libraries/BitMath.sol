@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 /// @title BitMath - Gas-efficient binary search for most/least significant bit
 /// @notice Finds MSB/LSB in O(log2(256)) = O(1) via de Bruijn-style bit tricks
 /// @dev Used by TickBitmap to locate the next initialized tick
 library BitMath {
+    error ZeroInput();
+
     /// @notice Returns the position of the most significant bit (MSB) of x
     /// @dev If x is 0, reverts. The MSB is the highest set bit.
     /// @param x The value to search
     /// @return msb The 0-indexed position of the most significant bit
     function mostSignificantBit(uint256 x) internal pure returns (uint8 msb) {
-        require(x > 0, "BitMath: x is zero");
+        if (!(x > 0)) revert ZeroInput();
 
         // Binary search using repeated halving - O(1) time
         if (x >= 1 << 128) { x >>= 128; msb += 128; }
@@ -28,7 +31,7 @@ library BitMath {
     /// @param x The value to search
     /// @return lsb The 0-indexed position of the least significant bit
     function leastSignificantBit(uint256 x) internal pure returns (uint8 lsb) {
-        require(x > 0, "BitMath: x is zero");
+        if (!(x > 0)) revert ZeroInput();
 
         // Binary search using repeated halving - O(1) time
         // If lower bits are zero, the LSB must be higher; shift right and accumulate offset
