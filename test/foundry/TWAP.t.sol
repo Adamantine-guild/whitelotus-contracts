@@ -83,8 +83,8 @@ contract TWAPTest is Test {
     }
 
     function testRevertUnauthorizedUpdate() public {
-        vm.prank(address(0xEVIL));
-        vm.expectRevert(abi.encodeWithSelector(TWAP.NotAuthorized.selector, address(0xEVIL)));
+        vm.prank(address(0xE00000000000000000000000000000000000E0));
+        vm.expectRevert(abi.encodeWithSelector(TWAP.NotAuthorized.selector, address(0xE00000000000000000000000000000000000E0)));
         twap.update(token0, token1, PRECISION, PRECISION);
     }
 
@@ -349,7 +349,8 @@ contract TWAPTest is Test {
         }
 
         uint256 amountOut = twap.consult(token0, PRECISION, token1, 30 minutes);
-        assertApproxEqRel(amountOut, 2.5 * PRECISION, 2e16, "TWAP averages price change");
+        uint256 expected = (5 * PRECISION) / 2;
+        assertApproxEqRel(amountOut, expected, 2e16, "TWAP averages price change");
     }
 
     function testTWAPSpikeInsensitive() public {

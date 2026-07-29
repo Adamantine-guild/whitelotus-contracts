@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {MinimalForwarder} from "../../contracts/MinimalForwarder.sol";
+import {AccessControl} from "../../contracts/AccessControl.sol";
 import {Governance} from "../../contracts/Governance.sol";
 import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
 
@@ -22,20 +23,26 @@ contract GovernanceTimelockMockERC20 {
 /// @notice Tests for the Governance admin timelock integration.
 ///
 /// Coverage:
-///   1.  updateAdmin – admin can transfer admin role
-///   2.  updateAdmin – non-admin cannot transfer admin role
-///   3.  updateAdmin – reverts on zero address
-///   4.  updateAdmin – reverts on same address
-///   5.  updateAdmin – emits AdminUpdated event
-///   6.  Timelock flow – schedule → wait → execute → proposal created
-///   7.  Timelock flow – non-admin cannot createProposal after admin is timelock
-///   8.  Timelock flow – direct createProposal from original admin reverts after transfer
-///   9.  Timelock flow – schedule with insufficient delay reverts
-///  10.  Timelock flow – execute before delay expires reverts
-///  11.  Timelock flow – cancel a scheduled operation
-///  12.  Timelock flow – minDelay is at least 48 hours
-///  13.  Timelock flow – cannot re-execute an already executed operation
-///  14.  Timelock flow – admin can schedule multiple proposals
+///   1.  Two-step admin transfer – propose + claim succeeds
+///   2.  proposeAdmin – non-admin cannot propose
+///   3.  proposeAdmin – reverts on zero address
+///   4.  proposeAdmin – reverts on same address
+///   5.  proposeAdmin – reverts on already pending address
+///   6.  proposeAdmin – emits AdminProposed event
+///   7.  claimAdmin – emits AdminClaimed event
+///   8.  claimAdmin – reverts when caller is not pending admin
+///   9.  claimAdmin – reverts when no pending admin
+///  10.  cancelAdminTransfer – cancels pending transfer
+///  11.  cancelAdminTransfer – reverts when no pending
+///  12.  Timelock flow – schedule → wait → execute → proposal created
+///  13.  Timelock flow – non-admin cannot createProposal after admin is timelock
+///  14.  Timelock flow – direct createProposal from original admin reverts after transfer
+///  15.  Timelock flow – schedule with insufficient delay reverts
+///  16.  Timelock flow – execute before delay expires reverts
+///  17.  Timelock flow – cancel a scheduled operation
+///  18.  Timelock flow – minDelay is at least 48 hours
+///  19.  Timelock flow – cannot re-execute an already executed operation
+///  20.  Timelock flow – admin can schedule multiple proposals
 contract GovernanceTimelockTest is Test {
     // ─── Constants ──────────────────────────────────────────────────────────
 
@@ -126,55 +133,136 @@ contract GovernanceTimelockTest is Test {
         return proposalId;
     }
 
-    // ─── 1. updateAdmin – admin can transfer admin role ───────────────────────
+    // ─── Helper ────────────────────────────────────────────────────────────
 
-    function testUpdateAdminSucceeds() public {
+    /// @dev Perform a full two-step admin transfer: propose + claim.
+    function _transferAdmin(address newAdmin) internal {
+        vm.prank(admin);
+        gov.proposeAdmin(newAdmin);
+        vm.prank(newAdmin);
+        gov.claimAdmin();
+    }
+
+    // ─── 1. Two-step admin transfer – propose + claim succeeds ─────────────
+
+    function testProposeAndClaimSucceeds() public {
         address newAdmin = address(0xDA);
         vm.prank(admin);
-        gov.updateAdmin(newAdmin);
+        gov.proposeAdmin(newAdmin);
+        assertEq(gov.pendingAdmin(), newAdmin);
+        assertEq(gov.admin(), admin); // admin unchanged until claim
+
+        vm.prank(newAdmin);
+        gov.claimAdmin();
         assertEq(gov.admin(), newAdmin);
+        assertEq(gov.pendingAdmin(), address(0));
     }
 
-    // ─── 2. updateAdmin – non-admin cannot transfer ───────────────────────────
+    // ─── 2. proposeAdmin – non-admin cannot propose ────────────────────────
 
-    function testUpdateAdminRevertsNonAdmin() public {
+    function testProposeAdminRevertsNonAdmin() public {
         vm.prank(stranger);
         vm.expectRevert("Not admin");
-        gov.updateAdmin(address(0xDA));
+        gov.proposeAdmin(address(0xDA));
     }
 
-    // ─── 3. updateAdmin – reverts on zero address ─────────────────────────────
+    // ─── 3. proposeAdmin – reverts on zero address ─────────────────────────
 
-    function testUpdateAdminRevertsZeroAddress() public {
+    function testProposeAdminRevertsZeroAddress() public {
         vm.prank(admin);
         vm.expectRevert("Zero admin");
-        gov.updateAdmin(address(0));
+        gov.proposeAdmin(address(0));
     }
 
-    // ─── 4. updateAdmin – reverts on same address ─────────────────────────────
+    // ─── 4. proposeAdmin – reverts on same address ─────────────────────────
 
-    function testUpdateAdminRevertsSameAddress() public {
+    function testProposeAdminRevertsSameAddress() public {
         vm.prank(admin);
         vm.expectRevert("Same admin");
-        gov.updateAdmin(admin);
+        gov.proposeAdmin(admin);
     }
 
-    // ─── 5. updateAdmin – emits AdminUpdated event ────────────────────────────
+    // ─── 5. proposeAdmin – reverts on already pending address ──────────────
 
-    function testUpdateAdminEmitsEvent() public {
+    function testProposeAdminRevertsAlreadyPending() public {
+        address newAdmin = address(0xDA);
+        vm.prank(admin);
+        gov.proposeAdmin(newAdmin);
+        vm.prank(admin);
+        vm.expectRevert("Already pending");
+        gov.proposeAdmin(newAdmin);
+    }
+
+    // ─── 6. proposeAdmin – emits AdminProposed event ───────────────────────
+
+    function testProposeAdminEmitsEvent() public {
         address newAdmin = address(0xDA);
         vm.prank(admin);
         vm.expectEmit(true, true, false, true);
-        emit Governance.AdminUpdated(admin, newAdmin);
-        gov.updateAdmin(newAdmin);
+        emit AccessControl.AdminProposed(admin, newAdmin);
+        gov.proposeAdmin(newAdmin);
     }
 
-    // ─── 6. Timelock flow – schedule → wait → execute → proposal created ──────
+    // ─── 7. claimAdmin – emits AdminClaimed event ──────────────────────────
+
+    function testClaimAdminEmitsEvent() public {
+        address newAdmin = address(0xDA);
+        vm.prank(admin);
+        gov.proposeAdmin(newAdmin);
+
+        vm.prank(newAdmin);
+        vm.expectEmit(true, true, false, true);
+        emit AccessControl.AdminClaimed(admin, newAdmin);
+        gov.claimAdmin();
+    }
+
+    // ─── 8. claimAdmin – reverts when caller is not pending admin ──────────
+
+    function testClaimAdminRevertsNotPending() public {
+        address newAdmin = address(0xDA);
+        vm.prank(admin);
+        gov.proposeAdmin(newAdmin);
+
+        vm.prank(stranger);
+        vm.expectRevert("Not pending");
+        gov.claimAdmin();
+    }
+
+    // ─── 9. claimAdmin – reverts when no pending admin ─────────────────────
+
+    function testClaimAdminRevertsNoPending() public {
+        vm.prank(stranger);
+        vm.expectRevert("No pending");
+        gov.claimAdmin();
+    }
+
+    // ─── 10. cancelAdminTransfer – cancels pending transfer ────────────────
+
+    function testCancelAdminTransferSucceeds() public {
+        address newAdmin = address(0xDA);
+        vm.prank(admin);
+        gov.proposeAdmin(newAdmin);
+        assertEq(gov.pendingAdmin(), newAdmin);
+
+        vm.prank(admin);
+        gov.cancelAdminTransfer();
+        assertEq(gov.pendingAdmin(), address(0));
+        assertEq(gov.admin(), admin); // unchanged
+    }
+
+    // ─── 11. cancelAdminTransfer – reverts when no pending ─────────────────
+
+    function testCancelAdminTransferRevertsNoPending() public {
+        vm.prank(admin);
+        vm.expectRevert("No pending");
+        gov.cancelAdminTransfer();
+    }
+
+    // ─── 12. Timelock flow – schedule → wait → execute → proposal created ──
 
     function testTimelockFullFlow() public {
-        // Step 1: Transfer admin to timelock.
-        vm.prank(admin);
-        gov.updateAdmin(address(timelock));
+        // Step 1: Two-step transfer admin to timelock.
+        _transferAdmin(address(timelock));
         assertEq(gov.admin(), address(timelock));
 
         // Step 2: Admin schedules a proposal through the timelock.
@@ -211,12 +299,11 @@ contract GovernanceTimelockTest is Test {
         assertTrue(timelock.isOperationDone(opId));
     }
 
-    // ─── 7. Timelock flow – non-admin cannot createProposal after admin is timelock
+    // ─── 13. Timelock flow – non-admin cannot createProposal after admin is timelock
 
     function testTimelockStrangerCannotCreateProposal() public {
-        // Transfer admin to timelock.
-        vm.prank(admin);
-        gov.updateAdmin(address(timelock));
+        // Two-step transfer admin to timelock.
+        _transferAdmin(address(timelock));
 
         // A stranger calling createProposal directly must revert.
         vm.prank(stranger);
@@ -224,12 +311,11 @@ contract GovernanceTimelockTest is Test {
         gov.createProposal("Evil Proposal", 1 days, 1 days);
     }
 
-    // ─── 8. Timelock flow – original admin cannot bypass timelock ─────────────
+    // ─── 14. Timelock flow – original admin cannot bypass timelock ─────────
 
     function testTimelockOriginalAdminCannotBypass() public {
-        // Transfer admin to timelock.
-        vm.prank(admin);
-        gov.updateAdmin(address(timelock));
+        // Two-step transfer admin to timelock.
+        _transferAdmin(address(timelock));
 
         // The original admin is no longer the Governance admin; direct call reverts.
         vm.prank(admin);
@@ -237,12 +323,11 @@ contract GovernanceTimelockTest is Test {
         gov.createProposal("Bypass Attempt", 1 days, 1 days);
     }
 
-    // ─── 9. Timelock flow – schedule with insufficient delay reverts ──────────
+    // ─── 15. Timelock flow – schedule with insufficient delay reverts ──────
 
     function testTimelockInsufficientDelayReverts() public {
-        // Transfer admin to timelock.
-        vm.prank(admin);
-        gov.updateAdmin(address(timelock));
+        // Two-step transfer admin to timelock.
+        _transferAdmin(address(timelock));
 
         bytes memory data = _createProposalCalldata();
         bytes32 salt = keccak256("salt");
@@ -257,12 +342,11 @@ contract GovernanceTimelockTest is Test {
         timelock.schedule(address(gov), 0, data, bytes32(0), salt, MIN_DELAY - 1);
     }
 
-    // ─── 10. Timelock flow – execute before delay reverts ─────────────────────
+    // ─── 16. Timelock flow – execute before delay reverts ─────────────────
 
     function testTimelockExecuteBeforeDelayReverts() public {
-        // Transfer admin to timelock.
-        vm.prank(admin);
-        gov.updateAdmin(address(timelock));
+        // Two-step transfer admin to timelock.
+        _transferAdmin(address(timelock));
 
         bytes32 opId = _scheduleCreateProposal();
 
@@ -281,12 +365,11 @@ contract GovernanceTimelockTest is Test {
         timelock.execute(address(gov), 0, data, bytes32(0), salt);
     }
 
-    // ─── 11. Timelock flow – cancel a scheduled operation ─────────────────────
+    // ─── 17. Timelock flow – cancel a scheduled operation ─────────────────
 
     function testTimelockCancelOperation() public {
-        // Transfer admin to timelock.
-        vm.prank(admin);
-        gov.updateAdmin(address(timelock));
+        // Two-step transfer admin to timelock.
+        _transferAdmin(address(timelock));
 
         bytes32 opId = _scheduleCreateProposal();
         assertTrue(timelock.isOperationPending(opId));
@@ -315,18 +398,17 @@ contract GovernanceTimelockTest is Test {
         timelock.execute(address(gov), 0, data, bytes32(0), salt);
     }
 
-    // ─── 12. Timelock flow – minDelay is at least 48 hours ─────────────────────
+    // ─── 18. Timelock flow – minDelay is at least 48 hours ─────────────────
 
     function testTimelockMinDelayIs48Hours() public view {
         assertGe(timelock.getMinDelay(), 48 hours, "minDelay must be >= 48 hours");
     }
 
-    // ─── 13. Timelock flow – cannot re-execute an already executed operation ──
+    // ─── 19. Timelock flow – cannot re-execute an already executed operation
 
     function testTimelockCannotReExecute() public {
-        // Transfer admin to timelock.
-        vm.prank(admin);
-        gov.updateAdmin(address(timelock));
+        // Two-step transfer admin to timelock.
+        _transferAdmin(address(timelock));
 
         bytes32 opId = _scheduleCreateProposal();
 
@@ -349,12 +431,11 @@ contract GovernanceTimelockTest is Test {
         timelock.execute(address(gov), 0, data, bytes32(0), salt);
     }
 
-    // ─── 14. Timelock flow – admin can schedule multiple proposals ─────────────
+    // ─── 20. Timelock flow – admin can schedule multiple proposals ─────────
 
     function testTimelockMultipleProposals() public {
-        // Transfer admin to timelock.
-        vm.prank(admin);
-        gov.updateAdmin(address(timelock));
+        // Two-step transfer admin to timelock.
+        _transferAdmin(address(timelock));
 
         // Schedule two distinct proposals.
         bytes32 salt1 = keccak256("salt1");
