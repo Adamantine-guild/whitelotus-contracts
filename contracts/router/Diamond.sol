@@ -7,6 +7,7 @@ import {IDiamondCut} from "../interfaces/IDiamondCut.sol";
 
 contract Diamond {
     error FunctionDoesNotExist();
+    error DirectETHNotAllowed();
 
     constructor(address _contractOwner, address _diamondCutFacet) payable {
         LibDiamond.setContractOwner(_contractOwner);
@@ -46,5 +47,7 @@ contract Diamond {
         }
     }
 
-    receive() external payable {}
+    receive() external payable {
+        revert DirectETHNotAllowed();
+    }
 }
