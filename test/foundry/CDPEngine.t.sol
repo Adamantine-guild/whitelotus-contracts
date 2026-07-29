@@ -156,6 +156,10 @@ contract CDPEngineTest is Test {
  
         vm.expectRevert("Liquidator: Position is safe");
         liquidator.liquidatePosition(address(ethCollateral), user, 1000 * 1e18);
+        stablecoin.approve(address(engine), type(uint256).max);
+
+        vm.expectRevert("CDPEngine: Position is safe");
+        engine.liquidate(address(ethCollateral), user, 1000 * 1e18, 1.15 * 1e18);
         vm.stopPrank();
     }
 }
