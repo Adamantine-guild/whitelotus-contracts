@@ -324,7 +324,12 @@ contract WhiteLotusERC4626 is
         super._withdraw(caller, receiver, owner, assets, shares);
     }
 
-    function _authorizeUpgrade(address) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
+    /// @notice Upgrades must be initiated by a contract (e.g. Gnosis Safe), never an EOA.
+    error EOAUpgradeNotAllowed();
+
+    function _authorizeUpgrade(address) internal override onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (tx.origin == msg.sender) revert EOAUpgradeNotAllowed();
+    }
 
     /// @dev Draws from strategies in queue order until `needed` is covered or they run dry.
     function _pullFromStrategies(uint256 needed) private returns (uint256 raised) {

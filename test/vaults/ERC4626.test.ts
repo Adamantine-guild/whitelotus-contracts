@@ -847,6 +847,24 @@ describe("WhiteLotusERC4626", function () {
   });
 
   describe("upgrades", function () {
+    let upgradeHelper: any;
+
+    beforeEach(async function () {
+      // Deploy a helper contract so upgrade calls come from a contract (multi-sig),
+      // not an EOA – matching the production Gnosis Safe flow.
+      const helperFactory = await ethers.getContractFactory(
+        "contracts/mocks/UpgradeHelper.sol:UpgradeHelper"
+      );
+      upgradeHelper = await helperFactory.deploy();
+      await upgradeHelper.waitForDeployment();
+
+      // Grant the helper the admin role so it can execute upgrades.
+      await vault.grantRole(
+        await vault.DEFAULT_ADMIN_ROLE(),
+        await upgradeHelper.getAddress()
+      );
+    });
+
     it("preserves vault state across an implementation swap", async function () {
       await vault.addStrategy(aaveAddress, MAX_BPS);
       await vault.connect(alice).deposit(1000n * WAD, await alice.getAddress());
@@ -860,7 +878,7 @@ describe("WhiteLotusERC4626", function () {
       const next = await factory.deploy();
       await next.waitForDeployment();
 
-      await vault.upgradeToAndCall(await next.getAddress(), "0x");
+      await upgradeHelper.executeUpgradeTo(vaultAddress, await next.getAddress(), "0x");
 
       expect(await vault.balanceOf(await alice.getAddress())).to.equal(sharesBefore);
       expect(await vault.totalAssets()).to.equal(1000n * WAD);
@@ -868,13 +886,27 @@ describe("WhiteLotusERC4626", function () {
       expect(await vault.decimals()).to.equal(18 + OFFSET);
     });
 
-    it("restricts upgrades to the admin", async function () {
+    it("reverts when an EOA calls upgradeToAndCall directly", async function () {
       const factory = await ethers.getContractFactory(
         "contracts/vaults/WhiteLotusERC4626.sol:WhiteLotusERC4626"
       );
       const next = await factory.deploy();
       await next.waitForDeployment();
 
+      // Even though governance has DEFAULT_ADMIN_ROLE, the EOA check blocks it.
+      await expect(
+        vault.upgradeToAndCall(await next.getAddress(), "0x")
+      ).to.be.revertedWithCustomError(vault, "EOAUpgradeNotAllowed");
+    });
+
+    it("restricts upgrades to the admin role", async function () {
+      const factory = await ethers.getContractFactory(
+        "contracts/vaults/WhiteLotusERC4626.sol:WhiteLotusERC4626"
+      );
+      const next = await factory.deploy();
+      await next.waitForDeployment();
+
+      // alice does not have DEFAULT_ADMIN_ROLE
       await expect(
         vault.connect(alice).upgradeToAndCall(await next.getAddress(), "0x")
       ).to.be.revertedWithCustomError(vault, "AccessControlUnauthorizedAccount");
