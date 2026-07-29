@@ -288,7 +288,14 @@ contract TWAP is Ownable {
         view
         returns (uint256 priceAverage)
     {
-        uint32 targetTimestamp = uint32(block.timestamp) - window;
+        uint32 targetTimestamp;
+        unchecked {
+            // Guard before subtracting so large windows revert cleanly instead of underflowing.
+            if (window > uint32(block.timestamp)) {
+                revert InsufficientWindow(pairId, uint32(block.timestamp), window);
+            }
+            targetTimestamp = uint32(block.timestamp) - window;
+        }
 
         // Find the observation at or just before targetTimestamp using binary search.
         (Observation memory oldestObs, bool found) = _binarySearch(pair, targetTimestamp);
@@ -305,6 +312,8 @@ contract TWAP is Ownable {
         // This includes all price data accumulated since the last observation,
         // matching Uniswap V2 behavior.
         uint32 timeDelta = uint32(block.timestamp) - oldestObs.timestamp;
+        // Exact zero means no elapsed time to average over.
+        // slither-disable-next-line incorrect-equality
         if (timeDelta == 0) revert InsufficientObservations(pairId, 0, 1);
 
         uint256 cumulativeDelta = pair.priceCumulativeLast - oldestObs.priceCumulative;

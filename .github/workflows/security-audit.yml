@@ -1,0 +1,179 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: security-audit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  solhint:
+    name: Solhint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Solhint
+        run: npm run security:solhint
+
+  slither:
+    name: Slither
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Build contracts for Slither
+        run: forge build --build-info --skip "./test/**" --skip "./script/**"
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "true"
+
+      - name: Run Slither
+        uses: crytic/slither-action@v0.4.1
+        with:
+          target: .
+          fail-on: medium
+          ignore-compile: true
+          slither-config: slither.config.json
+          node-version: "22.x"
+
+  mythril:
+    name: Mythril
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Build contracts
+        run: forge build --skip "./test/**" --skip "./script/**"
+        env:
+          FOUNDRY_DISABLE_NIGHTLY_WARNING: "true"
+
+      - name: Pull Mythril image
+        run: docker pull mythril/myth:latest
+
+      - name: Run Mythril on critical contracts
+        run: |
+          set -euo pipefail
+
+          analyze_artifact() {
+            local artifact="$1"
+            local name
+            name="$(basename "${artifact}" .json)"
+            local bytecode
+            bytecode="$(jq -r '.deployedBytecode.object // empty' "${artifact}")"
+
+            if [[ -z "${bytecode}" || "${bytecode}" == "0x" ]]; then
+              echo "Skipping ${name}: no deployed bytecode"
+              return 0
+            fi
+
+            echo "::group::Mythril analyze ${name}"
+            local output
+            output="$(docker run --rm \
+              mythril/myth:latest \
+              analyze \
+              -c "${bytecode}" \
+              --bin-runtime \
+              -t 1 \
+              --execution-timeout 60 \
+              --solver-timeout 10000 \
+              --max-depth 22 \
+              -o jsonv2 2>/dev/null || true)"
+
+            if [[ -z "${output}" ]]; then
+              echo "Mythril produced no output for ${name}"
+              echo "::endgroup::"
+              return 0
+            fi
+
+            local high_medium
+            if echo "${output}" | jq -e 'type == "array"' >/dev/null 2>&1; then
+              high_medium="$(echo "${output}" | jq '[.[]? | select(.severity == "High" or .severity == "Medium")] | length' 2>/dev/null || echo 0)"
+              echo "${output}" | jq -r '.[]? | select(.severity == "High" or .severity == "Medium") | "- [\(.severity)] \(.title // "issue")"' 2>/dev/null || true
+            else
+              high_medium="$(echo "${output}" | jq '[(.issues // [])[] | select(.severity == "High" or .severity == "Medium")] | length' 2>/dev/null || echo 0)"
+              echo "${output}" | jq -r '(.issues // [])[] | select(.severity == "High" or .severity == "Medium") | "- [\(.severity)] \(.title) (\(.["swc-id"] // "n/a"))"' 2>/dev/null || true
+            fi
+            echo "High/Medium findings for ${name}: ${high_medium}"
+            echo "::endgroup::"
+
+            if [[ "${high_medium}" != "0" ]]; then
+              echo "::error::Mythril found ${high_medium} High/Medium issue(s) in ${name}"
+              return 1
+            fi
+          }
+
+          artifacts=(
+            "out/GrantRound.sol/GrantRound.json"
+            "out/Vault.sol/Vault.json"
+            "out/FlashLender.sol/FlashLender.json"
+            "out/CDPEngine.sol/CDPEngine.json"
+            "out/MerkleAirdrop.sol/MerkleAirdrop.json"
+          )
+
+          failed=0
+          for artifact in "${artifacts[@]}"; do
+            if [[ ! -f "${artifact}" ]]; then
+              echo "::error::Missing artifact ${artifact}"
+              failed=1
+              continue
+            fi
+            if ! analyze_artifact "${artifact}"; then
+              failed=1
+            fi
+          done
+
+          exit "${failed}"

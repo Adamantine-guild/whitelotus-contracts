@@ -180,7 +180,7 @@ contract GrantRound is ERC2771Context {
         require(_milestones[appId].length == 0, "already set");
         require(amounts.length > 0, "no milestones");
 
-        uint256 total;
+        uint256 total = 0;
         for (uint256 i = 0; i < amounts.length; i++) {
             require(amounts[i] > 0, "amount 0");
             _milestones[appId].push(

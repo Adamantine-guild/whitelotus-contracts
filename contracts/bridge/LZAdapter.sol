@@ -134,6 +134,7 @@ abstract contract LZAdapter is Ownable, ILayerZeroReceiver {
             ),
             payInLzToken: false
         });
+        // solhint-disable-next-line check-send-result
         guid = endpoint.send{value: nativeFee}(
             params, ILayerZeroEndpointV2.MessagingFee(nativeFee, 0), msg.sender
         );

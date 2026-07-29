@@ -16,6 +16,7 @@ abstract contract BaseLogic is Initializable, UUPSUpgradeable, OwnableUpgradeabl
     /**
      * @dev Restricts the upgrade function to the owner of the contract.
      */
+    // solhint-disable-next-line no-empty-blocks
     function _authorizeUpgrade(address newImplementation) internal virtual override onlyOwner {}
 
     /**

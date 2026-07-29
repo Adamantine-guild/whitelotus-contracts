@@ -5,7 +5,10 @@ pragma solidity ^0.8.24;
  * @title DeterministicFactory
  * @notice Factory contract that deploys contracts using the CREATE2 opcode for predictable addresses.
  *         Ensures safety checks matching EIP-3607/EVM requirements.
+ * @dev Ether sent with deploy() is forwarded to the created contract via create2(callvalue(), ...);
+ *      the factory does not hold ETH. Suppress locked-ether: no withdraw path is required.
  */
+// slither-disable-next-line locked-ether
 contract DeterministicFactory {
     // ─── State ──────────────────────────────────────────────────────────────
 

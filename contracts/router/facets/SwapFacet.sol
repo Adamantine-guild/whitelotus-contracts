@@ -26,7 +26,7 @@ contract SwapFacet {
         emit TokensSwapped(msg.sender, tokenIn, tokenOut, amountIn, amountOut);
     }
 
-    function getAmountOut(address tokenIn, address tokenOut, uint256 amountIn)
+    function getAmountOut(address /* tokenIn */, address /* tokenOut */, uint256 amountIn)
         external
         view
         returns (uint256)

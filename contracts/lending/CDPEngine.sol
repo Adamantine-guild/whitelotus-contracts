@@ -200,12 +200,9 @@ contract CDPEngine is Ownable {
 
         uint256 price = getNormalizedPrice(collateralType);
 
-        // Seized collateral value in USD (with penalty applied)
-        uint256 collateralValueToSeize = (debtToCover * appliedPenalty) / 1e18;
-
-        // Seized collateral amount (normalized to 18 decimals)
-        // Amount = Value / Price
-        uint256 normalizedCollateralToSeize = (collateralValueToSeize * 1e18) / price;
+        // Seized collateral amount (normalized to 18 decimals):
+        // Amount = (debt * penalty) / price — multiply before dividing to avoid precision loss.
+        uint256 normalizedCollateralToSeize = (debtToCover * appliedPenalty) / price;
 
         // Convert normalized collateral amount to the token's native decimals
         uint256 collateralToSeize =
@@ -254,8 +251,16 @@ contract CDPEngine is Ownable {
         address feed = priceFeeds[token];
         require(feed != address(0), "CDPEngine: Price feed not set");
 
-        (, int256 answer,,,) = AggregatorV3Interface(feed).latestRoundData();
+        (
+            uint80 roundId,
+            int256 answer,
+            uint256 startedAt,
+            uint256 updatedAt,
+            uint80 answeredInRound
+        ) = AggregatorV3Interface(feed).latestRoundData();
         require(answer > 0, "CDPEngine: Invalid price");
+        require(updatedAt >= startedAt && updatedAt > 0, "CDPEngine: Incomplete round");
+        require(answeredInRound >= roundId, "CDPEngine: Stale round");
 
         uint8 decimals = AggregatorV3Interface(feed).decimals();
         if (decimals == 18) {

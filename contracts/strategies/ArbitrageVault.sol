@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Vault} from "../Vault.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {IERC3156FlashBorrower} from "../interfaces/IERC3156FlashBorrower.sol";
 
@@ -16,6 +17,7 @@ interface IERC3156FlashLender {
 }
 
 contract ArbitrageVault is Vault, ReentrancyGuard, IERC3156FlashBorrower {
+    using SafeERC20 for IERC20;
     // ─── Structs ────────────────────────────────────────────────────────────
 
     struct SwapStep {
@@ -62,7 +64,8 @@ contract ArbitrageVault is Vault, ReentrancyGuard, IERC3156FlashBorrower {
         require(msg.sender == owner() || keepers[msg.sender], "ArbitrageVault: Unauthorized caller");
         require(approvedLenders[lender], "ArbitrageVault: Untrusted lender");
 
-        IERC3156FlashLender(lender).flashLoan(this, token, amount, data);
+        bool success = IERC3156FlashLender(lender).flashLoan(this, token, amount, data);
+        require(success, "ArbitrageVault: Flash loan failed");
     }
 
     // ─── IERC3156FlashBorrower Callback ─────────────────────────────────────
@@ -101,7 +104,7 @@ contract ArbitrageVault is Vault, ReentrancyGuard, IERC3156FlashBorrower {
         require(balanceAfter >= repayment, "ArbitrageVault: Insufficient balance for repayment");
 
         // Approve lender to pull the repayment amount
-        IERC20(token).approve(msg.sender, repayment);
+        IERC20(token).forceApprove(msg.sender, repayment);
 
         // Record profit
         uint256 netProfit = balanceAfter - repayment - (balanceBefore - amount);

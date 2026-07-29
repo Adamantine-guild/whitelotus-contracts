@@ -21,15 +21,15 @@ library OracleReader {
 
         uint256 price = engine.getNormalizedPrice(collateralType);
         uint256 normalizedCollateral = engine.getNormalizedCollateralAmount(collateralType, collateral);
-        
-        uint256 collateralValue = (normalizedCollateral * price) / 1e18;
 
         // Fetch minCollateralRatio from collateralConfigs
-        (, uint256 minCollateralRatio, ) = engine.collateralConfigs(collateralType);
+        // slither-disable-next-line unused-return
+        (, uint256 minCollateralRatio,) = engine.collateralConfigs(collateralType);
+        require(minCollateralRatio > 0, "OracleReader: Invalid collateral ratio");
 
-        uint256 requiredCollateralValue = (debt * minCollateralRatio) / 1e18;
-        if (requiredCollateralValue == 0) return type(uint256).max;
-
-        healthFactor = (collateralValue * 1e18) / requiredCollateralValue;
+        // healthFactor = (collateralValue * 1e18) / requiredCollateralValue
+        // with collateralValue = collateral * price / 1e18 and required = debt * ratio / 1e18
+        // => (normalizedCollateral * price * 1e18) / (debt * minCollateralRatio)
+        healthFactor = (normalizedCollateral * price * 1e18) / (debt * minCollateralRatio);
     }
 }

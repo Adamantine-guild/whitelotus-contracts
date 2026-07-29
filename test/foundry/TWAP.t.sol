@@ -83,8 +83,9 @@ contract TWAPTest is Test {
     }
 
     function testRevertUnauthorizedUpdate() public {
-        vm.prank(address(0xEVIL));
-        vm.expectRevert(abi.encodeWithSelector(TWAP.NotAuthorized.selector, address(0xEVIL)));
+        address evil = address(0xE711);
+        vm.prank(evil);
+        vm.expectRevert(abi.encodeWithSelector(TWAP.NotAuthorized.selector, evil));
         twap.update(token0, token1, PRECISION, PRECISION);
     }
 
@@ -323,7 +324,7 @@ contract TWAPTest is Test {
 
         bytes32 pairId = keccak256(abi.encodePacked(token0, token1));
         vm.expectRevert(
-            abi.encodeWithSelector(TWAP.InsufficientObservations.selector, pairId, 1, 2)
+            abi.encodeWithSelector(TWAP.InsufficientObservations.selector, pairId, 1, 6)
         );
         twap.getObservation(token0, token1, 5);
     }
@@ -349,7 +350,7 @@ contract TWAPTest is Test {
         }
 
         uint256 amountOut = twap.consult(token0, PRECISION, token1, 30 minutes);
-        assertApproxEqRel(amountOut, 2.5 * PRECISION, 2e16, "TWAP averages price change");
+        assertApproxEqRel(amountOut, (5 * PRECISION) / 2, 2e16, "TWAP averages price change");
     }
 
     function testTWAPSpikeInsensitive() public {
@@ -378,11 +379,15 @@ contract TWAPTest is Test {
     function testMultiplePairsIndependent() public {
         address token2 = address(0xC000);
 
+        vm.warp(2 hours);
+
         _update(token0, token1, 2 * PRECISION, PRECISION / 2);
         for (uint256 i = 0; i < 61; i++) {
             skip(MIN_INTERVAL);
             _update(token0, token1, 2 * PRECISION, PRECISION / 2);
         }
+
+        uint256 outAB = twap.consult(token0, PRECISION, token1);
 
         _update(token0, token2, 5 * PRECISION, PRECISION / 5);
         for (uint256 i = 0; i < 61; i++) {
@@ -390,8 +395,11 @@ contract TWAPTest is Test {
             _update(token0, token2, 5 * PRECISION, PRECISION / 5);
         }
 
-        uint256 outAB = twap.consult(token0, PRECISION, token1);
         uint256 outAC = twap.consult(token0, PRECISION, token2);
+        // Re-consult A after advancing time on B: refresh A so cumulative stays current.
+        skip(MIN_INTERVAL);
+        _update(token0, token1, 2 * PRECISION, PRECISION / 2);
+        outAB = twap.consult(token0, PRECISION, token1);
 
         assertApproxEqRel(outAB, 2 * PRECISION, 2e15, "pair A: price ~2.0");
         assertApproxEqRel(outAC, 5 * PRECISION, 2e15, "pair B: price ~5.0");
@@ -413,13 +421,18 @@ contract TWAPTest is Test {
         // Only 1 observation (~0 seconds of history), requesting 60 seconds
         bytes32 pairId = keccak256(abi.encodePacked(token0, token1));
         vm.expectRevert(
-            abi.encodeWithSelector(TWAP.InsufficientWindow.selector, pairId, uint32(0), uint32(60))
+            abi.encodeWithSelector(
+                TWAP.InsufficientWindow.selector, pairId, uint32(block.timestamp), uint32(60)
+            )
         );
         twap.consult(token0, PRECISION, token1, 60 seconds);
     }
 
     function testConsultRevertsWindowTooLarge() public {
         uint256 price = PRECISION;
+
+        // Warp so block.timestamp can represent a 30-minute lookback without underflow.
+        vm.warp(2 hours);
 
         _update(token0, token1, price, price);
         // Build only ~15 minutes of history

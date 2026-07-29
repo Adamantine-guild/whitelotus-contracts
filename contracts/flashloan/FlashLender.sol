@@ -64,6 +64,8 @@ contract FlashLender is ERC4626, Ownable, ReentrancyGuard, IERC3156FlashLender {
         if (token != asset()) revert UnsupportedToken(token);
 
         IERC20 loanToken = IERC20(token);
+        // Balance snapshot is intentional for ERC-3156 repayment verification.
+        // slither-disable-next-line reentrancy-balance
         uint256 balanceBefore = loanToken.balanceOf(address(this));
         if (amount > balanceBefore) revert InsufficientLiquidity(balanceBefore, amount);
 
@@ -72,6 +74,8 @@ contract FlashLender is ERC4626, Ownable, ReentrancyGuard, IERC3156FlashLender {
         bytes32 callbackResult = receiver.onFlashLoan(msg.sender, token, amount, fee, data);
         if (callbackResult != CALLBACK_SUCCESS) revert InvalidCallback();
 
+        // Receiver is the ERC-3156 borrower; repayment is verified via balanceAfter.
+        // slither-disable-next-line arbitrary-send-erc20
         loanToken.safeTransferFrom(address(receiver), address(this), amount + fee);
         uint256 balanceAfter = loanToken.balanceOf(address(this));
         uint256 expectedBalance = balanceBefore + fee;
