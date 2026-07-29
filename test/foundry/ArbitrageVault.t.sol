@@ -165,7 +165,7 @@ contract ArbitrageVaultTest is Test {
         bytes memory data = abi.encode(steps);
 
         vm.prank(keeper);
-        vm.expectRevert(abi.encodeWithSignature("ReentrancyGuardReentrantCall()"));
+        vm.expectRevert(bytes("ReentrancyGuard: reentrant call"));
         vault.initiateFlashLoan(address(lender), address(token), 1000, data);
     }
 }

@@ -8,6 +8,7 @@ import {IERC20Metadata} from
     "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
+import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
@@ -56,7 +57,7 @@ import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 ///      │  This asymmetry matches DeFi convention: users can always exit.      │
 ///      └───────────────────────────────────────────────────────────────────────┘
 
-contract Vault is ERC4626, Ownable, Pausable {
+contract Vault is ERC4626, Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -179,6 +180,30 @@ contract Vault is ERC4626, Ownable, Pausable {
     {
         assets = mint(shares, receiver);
         if (assets > maxAssetsIn) revert SlippageExceeded2(assets, maxAssetsIn);
+    }
+
+    // ─── EIP-4626 Withdraw / Redeem Reentrancy Guards ───────────────────────
+
+    /// @inheritdoc ERC4626
+    /// @dev Protected by nonReentrant to prevent reentrancy via malicious ERC-777 token callbacks.
+    function withdraw(uint256 assets, address receiver, address owner)
+        public
+        override
+        nonReentrant
+        returns (uint256)
+    {
+        return super.withdraw(assets, receiver, owner);
+    }
+
+    /// @inheritdoc ERC4626
+    /// @dev Protected by nonReentrant to prevent reentrancy via malicious ERC-777 token callbacks.
+    function redeem(uint256 shares, address receiver, address owner)
+        public
+        override
+        nonReentrant
+        returns (uint256)
+    {
+        return super.redeem(shares, receiver, owner);
     }
 
     // ─── EIP-4626 maxDeposit / maxMint overrides ────────────────────────────
