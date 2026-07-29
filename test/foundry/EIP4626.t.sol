@@ -34,6 +34,10 @@ contract EIP4626Test is Test {
     MockERC20 internal underlying;
     MockERC4626Router internal router;
 
+    // ─── Events (re-declared for emit in tests) ─────────────────────────────
+    event FeeSwept(address indexed token, address indexed to, uint256 amount);
+    event TreasurySet(address indexed previousTreasury, address indexed newTreasury);
+
     address internal owner = makeAddr("owner");
     address internal alice = makeAddr("alice");
     address internal bob = makeAddr("bob");
@@ -629,5 +633,162 @@ contract EIP4626Test is Test {
     function testShareDecimalsEqualsAssetPlusOffset() public view {
         // underlying is 18 decimals, offset is 18 -> share decimals = 36
         assertEq(vault.decimals(), 36);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Section 11: Treasury & Fee Sweeping
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function testSetTreasuryEmitsEvent() public {
+        address newTreasury = makeAddr("treasury");
+
+        vm.expectEmit(true, true, false, true, address(vault));
+        emit TreasurySet(address(0), newTreasury);
+
+        vm.prank(owner);
+        vault.setTreasury(newTreasury);
+
+        assertEq(vault.treasury(), newTreasury);
+    }
+
+    function testSetTreasuryRevertsZeroAddress() public {
+        vm.prank(owner);
+        vm.expectRevert(Vault.InvalidTreasury.selector);
+        vault.setTreasury(address(0));
+    }
+
+    function testSetTreasuryOnlyOwner() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.setTreasury(makeAddr("treasury"));
+    }
+
+    function testSweepFeesTransfersTokensAndEmitsEvent() public {
+        address treasuryAddr = makeAddr("treasury");
+        vm.prank(owner);
+        vault.setTreasury(treasuryAddr);
+
+        // Simulate fees: send tokens directly to the vault
+        uint256 feeAmount = 100e18;
+        underlying.mint(address(vault), feeAmount);
+
+        uint256 treasuryBefore = underlying.balanceOf(treasuryAddr);
+        uint256 vaultBefore = underlying.balanceOf(address(vault));
+
+        vm.expectEmit(true, true, false, true, address(vault));
+        emit FeeSwept(address(underlying), treasuryAddr, feeAmount);
+
+        vm.prank(treasuryAddr);
+        vault.sweepFees(address(underlying));
+
+        assertEq(underlying.balanceOf(treasuryAddr), treasuryBefore + feeAmount);
+        assertEq(underlying.balanceOf(address(vault)), vaultBefore - feeAmount);
+    }
+
+    function testSweepFeesByOwner() public {
+        address treasuryAddr = makeAddr("treasury");
+        vm.prank(owner);
+        vault.setTreasury(treasuryAddr);
+
+        uint256 feeAmount = 50e18;
+        underlying.mint(address(vault), feeAmount);
+
+        vm.prank(owner);
+        vault.sweepFees(address(underlying));
+
+        assertEq(underlying.balanceOf(treasuryAddr), feeAmount);
+    }
+
+    function testSweepFeesRevertsNoFees() public {
+        address treasuryAddr = makeAddr("treasury");
+        vm.prank(owner);
+        vault.setTreasury(treasuryAddr);
+
+        // No extra tokens in vault beyond what depositors put in
+        vm.prank(treasuryAddr);
+        vm.expectRevert(Vault.NoFeesToSweep.selector);
+        vault.sweepFees(address(underlying));
+    }
+
+    function testSweepFeesRevertsTreasuryNotSet() public {
+        // Treasury is not set (address(0) by default)
+        underlying.mint(address(vault), 10e18);
+
+        vm.prank(owner);
+        vm.expectRevert(Vault.TreasuryNotSet.selector);
+        vault.sweepFees(address(underlying));
+    }
+
+    function testSetTreasuryUpdatesExisting() public {
+        address firstTreasury = makeAddr("treasury1");
+        address secondTreasury = makeAddr("treasury2");
+
+        vm.prank(owner);
+        vault.setTreasury(firstTreasury);
+        assertEq(vault.treasury(), firstTreasury);
+
+        vm.expectEmit(true, true, false, true, address(vault));
+        emit TreasurySet(firstTreasury, secondTreasury);
+
+        vm.prank(owner);
+        vault.setTreasury(secondTreasury);
+        assertEq(vault.treasury(), secondTreasury);
+    }
+
+    function testSweepFeesRevertsUnauthorized() public {
+        address treasuryAddr = makeAddr("treasury");
+        vm.prank(owner);
+        vault.setTreasury(treasuryAddr);
+
+        underlying.mint(address(vault), 10e18);
+
+        vm.prank(alice);
+        vm.expectRevert(Vault.NotTreasuryOrOwner.selector);
+        vault.sweepFees(address(underlying));
+    }
+
+    function testSweepFeesDifferentToken() public {
+        address treasuryAddr = makeAddr("treasury");
+        vm.prank(owner);
+        vault.setTreasury(treasuryAddr);
+
+        // Simulate a different ERC-20 token (e.g. airdrop) arriving at the vault
+        MockERC20 otherToken = new MockERC20("Other Token", "OTH", 18);
+        uint256 airdropAmount = 1_000e18;
+        otherToken.mint(address(vault), airdropAmount);
+
+        vm.prank(treasuryAddr);
+        vault.sweepFees(address(otherToken));
+
+        assertEq(otherToken.balanceOf(treasuryAddr), airdropAmount);
+        assertEq(otherToken.balanceOf(address(vault)), 0);
+    }
+
+    function testSweepFeesPreservesSharePriceForForeignToken() public {
+        address treasuryAddr = makeAddr("treasury");
+        vm.prank(owner);
+        vault.setTreasury(treasuryAddr);
+
+        // Alice deposits
+        vm.prank(alice);
+        uint256 aliceShares = vault.deposit(1_000e18, alice);
+        uint256 priceBefore = vault.convertToAssets(1e18);
+
+        // A foreign token (e.g. airdrop, fee token from strategy) arrives at the vault
+        MockERC20 otherToken = new MockERC20("Fee Token", "FEE", 18);
+        otherToken.mint(address(vault), 10_000e18);
+
+        // Sweep the foreign token as protocol fees
+        vm.prank(treasuryAddr);
+        vault.sweepFees(address(otherToken));
+
+        // Share price for the vault's underlying asset must be unchanged
+        uint256 priceAfter = vault.convertToAssets(1e18);
+        assertEq(priceAfter, priceBefore, "sweeping foreign token must not change share price");
+
+        // Alice can still redeem her full deposit
+        vm.prank(alice);
+        uint256 assetsBack = vault.redeem(aliceShares, alice, alice);
+        assertApproxEqAbs(assetsBack, 1_000e18, 2);
     }
 }

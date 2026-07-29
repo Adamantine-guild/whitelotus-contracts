@@ -74,9 +74,27 @@ contract Vault is ERC4626, Ownable, Pausable {
     /// @notice Raised when the assets required for a mint exceeds `maxAssetsIn`.
     error SlippageExceeded2(uint256 assetsIn, uint256 maxAssetsIn);
 
+    /// @notice Raised when treasury is set to the zero address.
+    error InvalidTreasury();
+
+    /// @notice Raised when caller is neither the treasury nor the owner.
+    error NotTreasuryOrOwner();
+
+    /// @notice Raised when there are no fees to sweep (token balance is zero).
+    error NoFeesToSweep();
+
+    /// @notice Raised when treasury has not been set.
+    error TreasuryNotSet();
+
     // ─── Events ─────────────────────────────────────────────────────────────
 
     event DeadSharesMinted(address indexed to, uint256 shares);
+
+    /// @notice Emitted when the protocol treasury receives swept fees.
+    event FeeSwept(address indexed token, address indexed to, uint256 amount);
+
+    /// @notice Emitted when the treasury address is updated.
+    event TreasurySet(address indexed previousTreasury, address indexed newTreasury);
 
     // ─── Constructor ────────────────────────────────────────────────────────
 
@@ -175,6 +193,39 @@ contract Vault is ERC4626, Ownable, Pausable {
     function maxMint(address receiver) public view override returns (uint256) {
         if (paused()) return 0;
         return super.maxMint(receiver);
+    }
+
+    // ─── Treasury ───────────────────────────────────────────────────────────
+
+    /// @notice Address that receives swept protocol fees.
+    address public treasury;
+
+    /// @dev Restricts callers to the treasury or the contract owner.
+    ///      Also ensures treasury has been set.
+    modifier onlyTreasuryOrOwner() {
+        if (treasury == address(0)) revert TreasuryNotSet();
+        if (msg.sender != treasury && msg.sender != owner()) revert NotTreasuryOrOwner();
+        _;
+    }
+
+    /// @notice Set the protocol treasury address.
+    /// @dev Only callable by the owner. The treasury receives swept fees.
+    /// @param newTreasury The new treasury address (must not be zero).
+    function setTreasury(address newTreasury) external onlyOwner {
+        if (newTreasury == address(0)) revert InvalidTreasury();
+        emit TreasurySet(treasury, newTreasury);
+        treasury = newTreasury;
+    }
+
+    /// @notice Sweep the entire balance of a given ERC-20 token from the vault to the treasury.
+    /// @dev Callable only by the treasury or the owner. For the vault's underlying asset,
+    ///      callers must ensure only protocol fees (not depositor funds) are swept.
+    /// @param token The ERC-20 token to sweep.
+    function sweepFees(address token) external onlyTreasuryOrOwner {
+        uint256 amount = IERC20(token).balanceOf(address(this));
+        if (amount == 0) revert NoFeesToSweep();
+        SafeERC20.safeTransfer(IERC20(token), treasury, amount);
+        emit FeeSwept(token, treasury, amount);
     }
 
     // ─── Admin ───────────────────────────────────────────────────────────────
