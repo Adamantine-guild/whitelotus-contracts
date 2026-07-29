@@ -203,6 +203,7 @@ contract CDPEngine is Ownable {
         if (!(pos.debt >= debtToCover)) revert CoverExceedsDebt();
 
         uint256 price = getNormalizedPrice(collateralType);
+        uint256 appliedPenalty = collateralConfigs[collateralType].liquidationPenalty;
 
         // Seized collateral value in USD (with penalty applied)
         uint256 collateralValueToSeize = (debtToCover * appliedPenalty) / 1e18;
