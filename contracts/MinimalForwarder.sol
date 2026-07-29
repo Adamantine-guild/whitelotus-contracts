@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 /// @title MinimalForwarder
 /// @notice EIP-712 compliant meta-transaction forwarder for sponsored/gasless transactions.
 ///
@@ -20,6 +21,14 @@ pragma solidity ^0.8.24;
 ///   - **Chain binding**: Domain separator includes `block.chainid`; signatures are
 ///     non-transferable across chains (fork safety).
 contract MinimalForwarder {
+    error Expired();
+    error NonceMismatch();
+    error InvalidSignatureLength();
+    error InvalidSignature();
+    error InvalidSignatureV();
+    error SignerRecoveryFailed();
+    error CallFailed();
+
     // ─── EIP-712 Domain ─────────────────────────────────────────────────────
 
     /// @dev EIP-712 type hash for the domain separator.
@@ -152,13 +161,13 @@ contract MinimalForwarder {
         returns (bool success, bytes memory returnData)
     {
         // ── Pre-flight checks ────────────────────────────────────────────────
-        require(block.timestamp <= req.deadline, "MinimalForwarder: expired");
-        require(req.nonce == nonces[req.from], "MinimalForwarder: nonce mismatch");
-        require(signature.length == 65, "MinimalForwarder: bad sig length");
+        if (!(block.timestamp <= req.deadline)) revert Expired();
+        if (!(req.nonce == nonces[req.from])) revert NonceMismatch();
+        if (!(signature.length == 65)) revert InvalidSignatureLength();
 
         bytes32 digest = _hashRequest(req);
         address signer = _recoverSigner(digest, signature);
-        require(signer == req.from, "MinimalForwarder: invalid signature");
+        if (!(signer == req.from)) revert InvalidSignature();
 
         // ── State mutation (increment nonce before call – reentrancy safe) ───
         nonces[req.from]++;
@@ -180,7 +189,7 @@ contract MinimalForwarder {
                     revert(add(returnData, 32), mload(returnData))
                 }
             }
-            revert("MinimalForwarder: call failed");
+            revert CallFailed();
         }
     }
 
@@ -203,10 +212,10 @@ contract MinimalForwarder {
         }
         // Normalise Ethereum-style v values (27/28).
         if (v < 27) v += 27;
-        require(v == 27 || v == 28, "MinimalForwarder: bad v");
+        if (!(v == 27 || v == 28)) revert InvalidSignatureV();
 
         address recovered = ecrecover(digest, v, r, s);
-        require(recovered != address(0), "MinimalForwarder: ecrecover failed");
+        if (!(recovered != address(0))) revert SignerRecoveryFailed();
         return recovered;
     }
 }

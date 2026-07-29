@@ -214,7 +214,7 @@ contract DiamondTest is Test {
         IDiamondCut(address(diamond)).diamondCut(cut, address(0), "");
 
         // Check if owner function reverted
-        vm.expectRevert("Diamond: Function does not exist");
+        vm.expectRevert(Diamond.FunctionDoesNotExist.selector);
         OwnershipFacet(address(diamond)).owner();
     }
 }

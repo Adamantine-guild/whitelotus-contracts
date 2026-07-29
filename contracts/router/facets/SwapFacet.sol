@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 import {AppStorage} from "../../libraries/AppStorage.sol";
 
 contract SwapFacet {
+    error InsufficientOutputAmount();
+
     AppStorage internal s;
 
     event TokensSwapped(
@@ -18,7 +21,7 @@ contract SwapFacet {
     ) external returns (uint256 amountOut) {
         // Simple mock router logic
         amountOut = amountIn; // 1:1 mock swap
-        require(amountOut >= minAmountOut, "SwapFacet: Insufficient output amount");
+        if (!(amountOut >= minAmountOut)) revert InsufficientOutputAmount();
 
         s.balances[msg.sender] += amountOut;
         s.totalSwaps += 1;

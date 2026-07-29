@@ -116,14 +116,14 @@ contract GrantRoundTest is Test {
         round.submitMilestoneEvidence(appId, 0, "ipfs://evidence0");
 
         vm.prank(stranger);
-        vm.expectRevert("Not admin");
+        vm.expectRevert(GrantRound.NotAdmin.selector);
         round.approveMilestone(appId, 0);
 
         vm.prank(admin);
         round.approveMilestone(appId, 0);
 
         vm.prank(stranger);
-        vm.expectRevert("Not admin");
+        vm.expectRevert(GrantRound.NotAdmin.selector);
         round.releasePayout(appId, 0);
     }
 

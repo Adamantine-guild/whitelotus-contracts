@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 /// @notice Minimal Chainlink AggregatorV3Interface for local testing.
 /// @dev Inline interface so tests do not require a Chainlink package dependency.
 interface AggregatorV3Interface {
@@ -36,6 +37,8 @@ interface AggregatorV3Interface {
 /// @title MockAggregatorV3 - Controllable price feed for local test suites
 /// @dev Never deploy this to production. Any caller can overwrite the latest answer.
 contract MockAggregatorV3 is AggregatorV3Interface {
+    error RoundNotFound();
+
     uint8 private immutable _decimals;
 
     uint80 private _roundId;
@@ -73,7 +76,7 @@ contract MockAggregatorV3 is AggregatorV3Interface {
         returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)
     {
         // Minimal mock: only the latest round is retained.
-        require(roundId_ == _roundId, "MockAggregatorV3: round not found");
+        if (!(roundId_ == _roundId)) revert RoundNotFound();
         return (_roundId, _answer, _startedAt, _updatedAt, _answeredInRound);
     }
 

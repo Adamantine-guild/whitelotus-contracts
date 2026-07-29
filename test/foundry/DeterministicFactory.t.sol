@@ -77,7 +77,7 @@ contract DeterministicFactoryTest is Test {
         factory.deploy(salt, targetBytecode);
 
         // Try deploying with the same salt again
-        vm.expectRevert("DeterministicFactory: Salt already used");
+        vm.expectRevert(DeterministicFactory.SaltAlreadyUsed.selector);
         factory.deploy(salt, targetBytecode);
     }
 
@@ -94,7 +94,7 @@ contract DeterministicFactoryTest is Test {
         assertFalse(factory.saltUsed(salt));
 
         // Now executing deploy will trigger EIP-3607 check for target already has code
-        vm.expectRevert("DeterministicFactory: Target already has code");
+        vm.expectRevert(DeterministicFactory.TargetAlreadyHasCode.selector);
         factory.deploy(salt, targetBytecode);
     }
 }

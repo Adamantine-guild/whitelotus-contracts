@@ -103,7 +103,7 @@ contract BitMathTest is Test {
     }
 
     function test_msb_reverts_on_zero() public {
-        vm.expectRevert("BitMath: x is zero");
+        vm.expectRevert(BitMath.ZeroInput.selector);
         wrapper.mostSignificantBit(0);
     }
 
@@ -153,7 +153,7 @@ contract BitMathTest is Test {
     }
 
     function test_lsb_reverts_on_zero() public {
-        vm.expectRevert("BitMath: x is zero");
+        vm.expectRevert(BitMath.ZeroInput.selector);
         wrapper.leastSignificantBit(0);
     }
 
@@ -417,12 +417,12 @@ contract TickBitmapTest is Test {
     }
 
     function test_flipTick_spacing_reverts_unaligned() public {
-        vm.expectRevert("TickBitmap: tick not aligned");
+        vm.expectRevert(TickBitmap.TickNotAligned.selector);
         wrapper.flipTick(5, 10);
     }
 
     function test_flipTick_spacing_reverts_unaligned_negative() public {
-        vm.expectRevert("TickBitmap: tick not aligned");
+        vm.expectRevert(TickBitmap.TickNotAligned.selector);
         wrapper.flipTick(-3, 10);
     }
 
@@ -480,7 +480,7 @@ contract TickBitmapTest is Test {
     }
 
     function test_isInitialized_reverts_unaligned() public {
-        vm.expectRevert("TickBitmap: tick not aligned");
+        vm.expectRevert(TickBitmap.TickNotAligned.selector);
         wrapper.isInitialized(5, 10);
     }
 

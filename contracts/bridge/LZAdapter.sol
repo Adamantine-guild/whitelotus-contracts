@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 interface ILayerZeroEndpointV2 {
@@ -40,6 +41,13 @@ interface ILayerZeroReceiver {
 }
 
 abstract contract LZAdapter is Ownable, ILayerZeroReceiver {
+    error ZeroEndpoint();
+    error ZeroPeer();
+    error ZeroGasLimit();
+    error ZeroExecutor();
+    error GasLimitNotSet();
+    error UnknownMessage();
+
     error CallerNotEndpoint();
     error InvalidPeer(uint32 srcEid, bytes32 sender);
     error MessageAlreadyProcessed(bytes32 guid);
@@ -63,24 +71,24 @@ abstract contract LZAdapter is Ownable, ILayerZeroReceiver {
     mapping(uint32 eid => address executor) public remoteExecutors;
 
     constructor(address endpoint_, address owner_) Ownable(owner_) {
-        require(endpoint_ != address(0), "LZAdapter: zero endpoint");
+        if (!(endpoint_ != address(0))) revert ZeroEndpoint();
         endpoint = ILayerZeroEndpointV2(endpoint_);
     }
 
     function setPeer(uint32 eid, bytes32 peer) external onlyOwner {
-        require(peer != bytes32(0), "LZAdapter: zero peer");
+        if (!(peer != bytes32(0))) revert ZeroPeer();
         peers[eid] = peer;
         emit PeerSet(eid, peer);
     }
 
     function setGasLimit(uint32 eid, uint128 gasLimit) external onlyOwner {
-        require(gasLimit != 0, "LZAdapter: zero gas limit");
+        if (!(gasLimit != 0)) revert ZeroGasLimit();
         gasLimits[eid] = gasLimit;
         emit GasLimitSet(eid, gasLimit);
     }
 
     function setRemoteExecutor(uint32 eid, address executor) external onlyOwner {
-        require(executor != address(0), "LZAdapter: zero executor");
+        if (!(executor != address(0))) revert ZeroExecutor();
         remoteExecutors[eid] = executor;
     }
 
@@ -123,7 +131,7 @@ abstract contract LZAdapter is Ownable, ILayerZeroReceiver {
         bytes32 peer = peers[dstEid];
         if (peer == bytes32(0)) revert MissingPeer(dstEid);
         uint128 gasLimit = gasLimits[dstEid];
-        require(gasLimit != 0, "LZAdapter: gas limit not set");
+        if (!(gasLimit != 0)) revert GasLimitNotSet();
 
         ILayerZeroEndpointV2.MessagingParams memory params = ILayerZeroEndpointV2.MessagingParams({
             dstEid: dstEid,
@@ -144,7 +152,7 @@ abstract contract LZAdapter is Ownable, ILayerZeroReceiver {
     function _handleMessage(uint32 srcEid, bytes calldata message) internal virtual {
         (uint8 kind, address target, bytes memory data) =
             abi.decode(message, (uint8, address, bytes));
-        require(kind == 1, "LZAdapter: unknown message");
+        if (!(kind == 1)) revert UnknownMessage();
         if (target != remoteExecutors[srcEid]) {
             revert InvalidRemoteExecutor(srcEid, target);
         }

@@ -66,7 +66,7 @@ contract MockAggregatorV3Test is Test {
 
     function test_GetRoundDataRevertsForUnknownRound() public {
         MockAggregatorV3 feed = new MockAggregatorV3(8, 1_000e8);
-        vm.expectRevert(bytes("MockAggregatorV3: round not found"));
+        vm.expectRevert(MockAggregatorV3.RoundNotFound.selector);
         feed.getRoundData(99);
     }
 }

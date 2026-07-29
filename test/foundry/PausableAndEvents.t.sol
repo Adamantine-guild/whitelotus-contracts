@@ -30,7 +30,7 @@ contract PausableAndEventsTest is Test {
         assertTrue(round.paused());
 
         vm.prank(admin);
-        vm.expectRevert(bytes("paused"));
+        vm.expectRevert(GrantRound.ContractPaused.selector);
         round.deposit{value: 1 ether}();
     }
 
@@ -49,7 +49,7 @@ contract PausableAndEventsTest is Test {
 
     function testOnlyAdminCanPause() public {
         vm.prank(stranger);
-        vm.expectRevert(bytes("Not admin"));
+        vm.expectRevert(GrantRound.NotAdmin.selector);
         round.pause();
     }
 
@@ -75,7 +75,7 @@ contract PausableAndEventsTest is Test {
         round.pause();
 
         vm.prank(admin);
-        vm.expectRevert(bytes("already paused"));
+        vm.expectRevert(GrantRound.AlreadyPaused.selector);
         round.pause();
     }
 
