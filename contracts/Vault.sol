@@ -5,7 +5,8 @@ import {ERC4626} from "openzeppelin-contracts/contracts/token/ERC20/extensions/E
 import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
-import {Pausable} from "openzeppelin-contracts/contracts/utils/Pausable.sol";
+import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
+import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
@@ -22,20 +23,14 @@ import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 ///      │    2. Attacker donates a large amount directly to the vault.          │
 ///      │    3. Next depositor's preview rounds to 0 shares; funds are stolen. │
 ///      │                                                                       │
-///      │  We defend with TWO layered mechanisms:                               │
-///      │                                                                       │
-///      │  A) Virtual Share Offset (_decimalsOffset = 18)                       │
-///      │     OZ's ERC4626 adds `10**_decimalsOffset()` to both numerator and  │
-///      │     denominator of every share↔asset conversion. With an offset of   │
-///      │     18 the virtual pool is 10^18 shares / 10^18 assets, so an        │
-///      │     attacker would need to donate 10^18 tokens (≈1 ETH-scaled unit)  │
-///      │     per wei of victim deposit to grief them — economically absurd.   │
-///      │                                                                       │
-///      │  B) Dead shares on first deposit                                      │
+///      │  We defend with dead shares on first deposit:                         │
 ///      │     The constructor mints DEAD_SHARES to address(1). These shares    │
 ///      │     are permanently locked ("dead"). They ensure totalSupply() > 0   │
 ///      │     from the very first moment, so the share price is always          │
 ///      │     anchored, even before any real user interacts with the vault.     │
+///      │     Combined with OZ's built-in +1 virtual offset, an attacker would  │
+///      │     need to donate ~DEAD_SHARES tokens per wei of victim deposit to   │
+///      │     grief them — economically absurd for DEAD_SHARES=1000.            │
 ///      └───────────────────────────────────────────────────────────────────────┘
 ///
 ///      ┌─ Yield Accrual ───────────────────────────────────────────────────────┐
@@ -60,7 +55,7 @@ import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 ///      │  This asymmetry matches DeFi convention: users can always exit.      │
 ///      └───────────────────────────────────────────────────────────────────────┘
 
-contract Vault is ERC4626, Ownable, Pausable {
+contract Vault is ERC4626, Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -78,9 +73,27 @@ contract Vault is ERC4626, Ownable, Pausable {
     /// @notice Raised when the assets required for a mint exceeds `maxAssetsIn`.
     error SlippageExceeded2(uint256 assetsIn, uint256 maxAssetsIn);
 
+    /// @notice Raised when treasury is set to the zero address.
+    error InvalidTreasury();
+
+    /// @notice Raised when caller is neither the treasury nor the owner.
+    error NotTreasuryOrOwner();
+
+    /// @notice Raised when there are no fees to sweep (token balance is zero).
+    error NoFeesToSweep();
+
+    /// @notice Raised when treasury has not been set.
+    error TreasuryNotSet();
+
     // ─── Events ─────────────────────────────────────────────────────────────
 
     event DeadSharesMinted(address indexed to, uint256 shares);
+
+    /// @notice Emitted when the protocol treasury receives swept fees.
+    event FeeSwept(address indexed token, address indexed to, uint256 amount);
+
+    /// @notice Emitted when the treasury address is updated.
+    event TreasurySet(address indexed previousTreasury, address indexed newTreasury);
 
     // ─── Constructor ────────────────────────────────────────────────────────
 
@@ -92,8 +105,9 @@ contract Vault is ERC4626, Ownable, Pausable {
     constructor(IERC20 asset_, string memory name_, string memory symbol_, address owner_)
         ERC4626(asset_)
         ERC20(name_, symbol_)
-        Ownable(owner_)
+        Ownable()
     {
+        if (owner_ != msg.sender) _transferOwnership(owner_);
         // ── Dead-share seeding ───────────────────────────────────────────────
         // Mint DEAD_SHARES to address(1) (a non-zero address that can never
         // sign transactions on mainnet, making these shares permanently locked).
@@ -104,7 +118,6 @@ contract Vault is ERC4626, Ownable, Pausable {
         // We call _mint() directly because the asset has not yet been deposited —
         // we are creating "empty" dead shares that inflate the denominator of
         // future conversions. Their cost is paid in diluted real assets, but
-        // since DEAD_SHARES is tiny relative to 10**_decimalsOffset() the
         // impact on honest depositors is negligible.
         _mint(address(1), DEAD_SHARES);
         emit DeadSharesMinted(address(1), DEAD_SHARES);
@@ -118,19 +131,6 @@ contract Vault is ERC4626, Ownable, Pausable {
     ///      automatically increases the share price for all holders.
     function totalAssets() public view override returns (uint256) {
         return IERC20(asset()).balanceOf(address(this));
-    }
-
-    /// @dev Overrides the OZ virtual shares offset to 18.
-    ///
-    ///      OpenZeppelin's ERC4626 formulas are:
-    ///        shares = assets * (totalSupply + 10**offset) / (totalAssets + 10**offset)
-    ///        assets = shares * (totalAssets + 10**offset) / (totalSupply + 10**offset)
-    ///
-    ///      With offset=18 the virtual pool starts at 1e18 / 1e18. An attacker
-    ///      would need to donate 1e18 underlying tokens per 1-wei deposit to
-    ///      cause even 1 wei of rounding loss — economically irrational.
-    function _decimalsOffset() internal pure override returns (uint8) {
-        return 18;
     }
 
     // ─── Standard EIP-4626 entry points (with pause guard on deposits) ──────
@@ -180,6 +180,30 @@ contract Vault is ERC4626, Ownable, Pausable {
         if (assets > maxAssetsIn) revert SlippageExceeded2(assets, maxAssetsIn);
     }
 
+    // ─── EIP-4626 Withdraw / Redeem Reentrancy Guards ───────────────────────
+
+    /// @inheritdoc ERC4626
+    /// @dev Protected by nonReentrant to prevent reentrancy via malicious ERC-777 token callbacks.
+    function withdraw(uint256 assets, address receiver, address owner)
+        public
+        override
+        nonReentrant
+        returns (uint256)
+    {
+        return super.withdraw(assets, receiver, owner);
+    }
+
+    /// @inheritdoc ERC4626
+    /// @dev Protected by nonReentrant to prevent reentrancy via malicious ERC-777 token callbacks.
+    function redeem(uint256 shares, address receiver, address owner)
+        public
+        override
+        nonReentrant
+        returns (uint256)
+    {
+        return super.redeem(shares, receiver, owner);
+    }
+
     // ─── EIP-4626 maxDeposit / maxMint overrides ────────────────────────────
 
     /// @dev Returns 0 when paused (spec §4.7: maxDeposit MUST return 0 if deposits are disabled).
@@ -192,6 +216,44 @@ contract Vault is ERC4626, Ownable, Pausable {
     function maxMint(address receiver) public view override returns (uint256) {
         if (paused()) return 0;
         return super.maxMint(receiver);
+    }
+
+    // ─── Treasury ───────────────────────────────────────────────────────────
+
+    /// @notice Address that receives swept protocol fees.
+    address public treasury;
+
+    /// @notice Cumulative amount of fees swept across all tokens (denominated in each token's units).
+    ///         Each sweep increments this counter by the amount transferred.
+    uint256 public totalFeesSwept;
+
+    /// @dev Restricts callers to the treasury or the contract owner.
+    ///      Also ensures treasury has been set.
+    modifier onlyTreasuryOrOwner() {
+        if (treasury == address(0)) revert TreasuryNotSet();
+        if (msg.sender != treasury && msg.sender != owner()) revert NotTreasuryOrOwner();
+        _;
+    }
+
+    /// @notice Set the protocol treasury address.
+    /// @dev Only callable by the owner. The treasury receives swept fees.
+    /// @param newTreasury The new treasury address (must not be zero).
+    function setTreasury(address newTreasury) external onlyOwner {
+        if (newTreasury == address(0)) revert InvalidTreasury();
+        emit TreasurySet(treasury, newTreasury);
+        treasury = newTreasury;
+    }
+
+    /// @notice Sweep the entire balance of a given ERC-20 token from the vault to the treasury.
+    /// @dev Callable only by the treasury or the owner. For the vault's underlying asset,
+    ///      callers must ensure only protocol fees (not depositor funds) are swept.
+    /// @param token The ERC-20 token to sweep.
+    function sweepFees(address token) external onlyTreasuryOrOwner {
+        uint256 amount = IERC20(token).balanceOf(address(this));
+        if (amount == 0) revert NoFeesToSweep();
+        totalFeesSwept += amount;
+        SafeERC20.safeTransfer(IERC20(token), treasury, amount);
+        emit FeeSwept(token, treasury, amount);
     }
 
     // ─── Admin ───────────────────────────────────────────────────────────────

@@ -96,7 +96,8 @@ contract CDPEngine is Ownable {
 
     // ─── Constructor ────────────────────────────────────────────────────────
 
-    constructor(IMintableERC20 stablecoin_, address owner_) Ownable(owner_) {
+    constructor(IMintableERC20 stablecoin_, address owner_) Ownable() {
+        if (owner_ != msg.sender) _transferOwnership(owner_);
         if (!(address(stablecoin_) != address(0))) revert ZeroStablecoin();
         stablecoin = stablecoin_;
     }

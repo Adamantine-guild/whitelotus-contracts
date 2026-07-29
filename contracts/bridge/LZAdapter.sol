@@ -70,7 +70,8 @@ abstract contract LZAdapter is Ownable, ILayerZeroReceiver {
     mapping(bytes32 guid => bool processed) public processedGuid;
     mapping(uint32 eid => address executor) public remoteExecutors;
 
-    constructor(address endpoint_, address owner_) Ownable(owner_) {
+    constructor(address endpoint_, address owner_) Ownable() {
+        if (owner_ != msg.sender) _transferOwnership(owner_);
         if (!(endpoint_ != address(0))) revert ZeroEndpoint();
         endpoint = ILayerZeroEndpointV2(endpoint_);
     }

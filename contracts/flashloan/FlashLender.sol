@@ -6,7 +6,7 @@ import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 import {IERC3156FlashBorrower} from "../interfaces/IERC3156FlashBorrower.sol";
 import {IERC3156FlashLender} from "../interfaces/IERC3156FlashLender.sol";
@@ -38,7 +38,8 @@ contract FlashLender is ERC4626, Ownable, ReentrancyGuard, IERC3156FlashLender {
         string memory symbol_,
         address governance_,
         uint256 initialFeeBps
-    ) ERC4626(asset_) ERC20(name_, symbol_) Ownable(governance_) {
+    ) ERC4626(asset_) ERC20(name_, symbol_) Ownable() {
+        if (governance_ != msg.sender) _transferOwnership(governance_);
         _setFee(initialFeeBps);
     }
 
@@ -52,7 +53,17 @@ contract FlashLender is ERC4626, Ownable, ReentrancyGuard, IERC3156FlashLender {
 
     function flashFee(address token, uint256 amount) public view override returns (uint256) {
         if (token != asset()) revert UnsupportedToken(token);
-        return Math.mulDiv(amount, feeBps, BPS_DENOMINATOR, Math.Rounding.Ceil);
+        // Compute ceil(amount * feeBps / BPS_DENOMINATOR) so fee always rounds up.
+        // Safe unchecked: feeBps ≤ MAX_FEE_BPS (100), amount bounded by token total supply.
+        uint256 fee;
+        unchecked {
+            uint256 numerator = amount * feeBps;
+            fee = numerator / BPS_DENOMINATOR;
+            if (numerator % BPS_DENOMINATOR != 0) {
+                fee += 1;
+            }
+        }
+        return fee;
     }
 
     function flashLoan(

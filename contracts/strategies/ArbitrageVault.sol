@@ -17,7 +17,7 @@ interface IERC3156FlashLender {
     ) external returns (bool);
 }
 
-contract ArbitrageVault is Vault, ReentrancyGuard, IERC3156FlashBorrower {
+contract ArbitrageVault is Vault, IERC3156FlashBorrower {
     using SafeERC20 for IERC20;
     // ─── Structs ────────────────────────────────────────────────────────────
 
