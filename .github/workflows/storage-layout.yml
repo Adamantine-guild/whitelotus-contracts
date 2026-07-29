@@ -1,38 +1,32 @@
 name: Storage Layout Validation
-
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-
 jobs:
   validate-storage:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
-
+      with:
+        submodules: recursive
     - name: Install Foundry
       uses: foundry-rs/foundry-toolchain@v1
       with:
         version: nightly
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
     - name: Use Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '22.x'
         cache: 'npm'
-
     - name: Install dependencies
       run: npm ci || npm install --legacy-peer-deps
-
     - name: Compile contracts
       run: npx hardhat compile
       env:
         FOUNDRY_DISABLE_NIGHTLY_WARNING: true
-
     - name: Run Upgradeability Storage Tests
       run: npx hardhat test test/upgradeability/Storage.test.ts

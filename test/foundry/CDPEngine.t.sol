@@ -42,6 +42,7 @@ contract CDPEngineTest is Test {
 
         // Admin whitelists collaterals and sets price feeds
         vm.startPrank(admin);
+        engine.setLiquidatorRole(address(liquidator));
 
         // WBTC: minCollateralRatio = 150%, penalty = 110%
         engine.whitelistCollateral(address(wbtc), 1.5 * 1e18, 1.1 * 1e18);
@@ -127,13 +128,13 @@ contract CDPEngineTest is Test {
         stablecoin.approve(address(liquidator), type(uint256).max);
 
         // Liquidator covers 5,000 LUSD debt via Liquidator helper
-        // Seized value: 5000 * 1.15 (penalty) = 5750 USD.
-        // Seized amount in ETH: 5750 * 1e18 / 1900 = 3.026315789473684210 ETH
+        // Seized value: 5000 * 1.05 (tier 1 penalty) = 5250 USD.
+        // Seized amount in ETH: 5250 * 1e18 / 1900 = 2.763157894736842105 ETH
         uint256 balanceBefore = ethCollateral.balanceOf(liquidatorUser);
         liquidator.liquidatePosition(address(ethCollateral), user, 5000 * 1e18);
         uint256 balanceAfter = ethCollateral.balanceOf(liquidatorUser);
-
-        uint256 expectedSeized = (uint256(5750) * 1e18) / 1900;
+ 
+        uint256 expectedSeized = (uint256(5250) * 1e18) / 1900;
         assertEq(balanceAfter - balanceBefore, expectedSeized);
         vm.stopPrank();
 
@@ -151,6 +152,10 @@ contract CDPEngineTest is Test {
 
         stablecoin.mint(liquidatorUser, 10_000 * 1e18);
         vm.startPrank(liquidatorUser);
+        stablecoin.approve(address(liquidator), type(uint256).max);
+ 
+        vm.expectRevert("Liquidator: Position is safe");
+        liquidator.liquidatePosition(address(ethCollateral), user, 1000 * 1e18);
         stablecoin.approve(address(engine), type(uint256).max);
 
         vm.expectRevert("CDPEngine: Position is safe");
