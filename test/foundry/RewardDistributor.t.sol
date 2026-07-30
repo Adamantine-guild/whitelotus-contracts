@@ -273,14 +273,14 @@ contract RewardDistributorTest is Test {
         rewardToken.mint(alice, 1e18);
         vm.startPrank(alice);
         rewardToken.approve(address(distributor), 1e18);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+        vm.expectRevert("Ownable: caller is not the owner");
         distributor.fund(1e18, DURATION);
         vm.stopPrank();
     }
 
     function testOnlyOwnerCanRecoverUnallocated() public {
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, alice));
+        vm.expectRevert("Ownable: caller is not the owner");
         distributor.recoverUnallocated(alice);
     }
 
