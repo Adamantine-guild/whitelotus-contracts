@@ -1,5 +1,6 @@
-openzeppelin-contracts/contracts/=node_modules/@openzeppelin/contracts/
-@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/
-@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/
+openzeppelin-contracts/=lib/openzeppelin-contracts/
+openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/
+@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
 forge-std/=lib/forge-std/src/
 @layerzerolabs/solidity-examples/=node_modules/@layerzerolabs/solidity-examples/
