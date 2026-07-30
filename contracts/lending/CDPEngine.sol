@@ -82,6 +82,7 @@ contract CDPEngine is Ownable {
         address indexed token, uint256 minCollateralRatio, uint256 liquidationPenalty
     );
     event PriceFeedSet(address indexed token, address indexed priceFeed);
+    event LiquidatorRoleSet(address indexed liquidator);
     event CollateralDeposited(address indexed collateralType, address indexed user, uint256 amount);
     event CollateralWithdrawn(address indexed collateralType, address indexed user, uint256 amount);
     event Borrowed(address indexed collateralType, address indexed user, uint256 amount);
@@ -133,6 +134,7 @@ contract CDPEngine is Ownable {
 
     function setLiquidatorRole(address _liquidator) external onlyOwner {
         liquidatorRole = _liquidator;
+        emit LiquidatorRoleSet(_liquidator);
     }
 
     // ─── Collateral Operations ──────────────────────────────────────────────
