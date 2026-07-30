@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
-import {ReentrancyGuard} from "openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 /// @title RewardDistributor - Accumulator-based staking reward distribution
@@ -120,7 +120,8 @@ contract RewardDistributor is Ownable, ReentrancyGuard {
     /// @param stakingToken_ Token accepted for staking.
     /// @param rewardToken_  Token paid out as reward. May equal `stakingToken_`.
     /// @param owner_        Address permitted to fund periods and recover unallocated rewards.
-    constructor(IERC20 stakingToken_, IERC20 rewardToken_, address owner_) Ownable(owner_) {
+    constructor(IERC20 stakingToken_, IERC20 rewardToken_, address owner_) Ownable() {
+        _transferOwnership(owner_);
         if (address(stakingToken_) == address(0)) revert ZeroAddress();
         if (address(rewardToken_) == address(0)) revert ZeroAddress();
 

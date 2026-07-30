@@ -59,6 +59,7 @@ abstract contract LZAdapter is Ownable, ILayerZeroReceiver {
 
     event PeerSet(uint32 indexed eid, bytes32 indexed peer);
     event GasLimitSet(uint32 indexed eid, uint128 gasLimit);
+    event RemoteExecutorSet(uint32 indexed eid, address indexed executor);
     event MessageSent(bytes32 indexed guid, uint32 indexed dstEid, bytes message);
     event MessageReceived(bytes32 indexed guid, uint32 indexed srcEid, uint64 nonce);
     event RemoteCallExecuted(uint32 indexed srcEid, address indexed target, bytes data);
@@ -91,6 +92,7 @@ abstract contract LZAdapter is Ownable, ILayerZeroReceiver {
     function setRemoteExecutor(uint32 eid, address executor) external onlyOwner {
         if (!(executor != address(0))) revert ZeroExecutor();
         remoteExecutors[eid] = executor;
+        emit RemoteExecutorSet(eid, executor);
     }
 
     function sendGovernanceCall(

@@ -32,7 +32,7 @@ contract Deploy is Script {
         console.log("Deployer :", deployer);
         console.log("Admin    :", admin);
         if (admin != deployer && admin.code.length > 0) {
-            console.log("           (contract – multi-sig upgrade enforcement active)");
+            console.log("           (contract - multi-sig upgrade enforcement active)");
         }
         console.log("");
 
@@ -99,7 +99,7 @@ contract Deploy is Script {
         console.log("StakingLogic Proxy:", address(stakingProxy));
 
         if (admin.code.length > 0) {
-            console.log("Admin is a contract – multi-sig upgrade enforcement active.");
+            console.log("Admin is a contract - multi-sig upgrade enforcement active.");
         } else {
             console.log("WARNING: Admin is an EOA.");
             console.log("  Run `npx hardhat run scripts/transferAdmin.ts` to hand off to a Safe.");
