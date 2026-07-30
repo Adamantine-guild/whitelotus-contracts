@@ -12,6 +12,9 @@ contract StakingLogic is BaseLogic {
     error InsufficientStake(uint256 staked, uint256 requested);
     error AlreadyInitialOwner();
 
+    event Staked(address indexed account, uint256 amount);
+    event Unstaked(address indexed account, uint256 amount);
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -28,6 +31,7 @@ contract StakingLogic is BaseLogic {
         if (amount == 0) revert ZeroAmount();
         totalStaked += amount;
         balances[msg.sender] += amount;
+        emit Staked(msg.sender, amount);
     }
 
     function unstake(uint256 amount) external {
@@ -38,5 +42,6 @@ contract StakingLogic is BaseLogic {
             balances[msg.sender] = staked - amount;
         }
         totalStaked -= amount;
+        emit Unstaked(msg.sender, amount);
     }
 }

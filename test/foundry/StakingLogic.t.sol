@@ -30,6 +30,8 @@ contract StakingLogicTest is Test {
     }
 
     function test_StakeIncreasesBalance() public {
+        vm.expectEmit(true, true, false, false);
+        emit StakingLogic.Staked(alice, 100e18);
         vm.prank(alice);
         staking.stake(100e18);
         assertEq(staking.balances(alice), 100e18);
@@ -37,8 +39,12 @@ contract StakingLogicTest is Test {
     }
 
     function test_StakeMultipleUsers() public {
+        vm.expectEmit(true, true, false, false);
+        emit StakingLogic.Staked(alice, 50e18);
         vm.prank(alice);
         staking.stake(50e18);
+        vm.expectEmit(true, true, false, false);
+        emit StakingLogic.Staked(bob, 30e18);
         vm.prank(bob);
         staking.stake(30e18);
         assertEq(staking.balances(alice), 50e18);
@@ -64,6 +70,8 @@ contract StakingLogicTest is Test {
     function test_UnstakePartial() public {
         vm.prank(alice);
         staking.stake(100e18);
+        vm.expectEmit(true, true, false, false);
+        emit StakingLogic.Unstaked(alice, 30e18);
         vm.prank(alice);
         staking.unstake(30e18);
         assertEq(staking.balances(alice), 70e18);
@@ -73,6 +81,8 @@ contract StakingLogicTest is Test {
     function test_UnstakeFull() public {
         vm.prank(alice);
         staking.stake(50e18);
+        vm.expectEmit(true, true, false, false);
+        emit StakingLogic.Unstaked(alice, 50e18);
         vm.prank(alice);
         staking.unstake(50e18);
         assertEq(staking.balances(alice), 0);
@@ -89,8 +99,14 @@ contract StakingLogicTest is Test {
 
     function test_StakeAccumulatesAcrossCalls() public {
         vm.startPrank(alice);
+        vm.expectEmit(true, true, false, false);
+        emit StakingLogic.Staked(alice, 10e18);
         staking.stake(10e18);
+        vm.expectEmit(true, true, false, false);
+        emit StakingLogic.Staked(alice, 20e18);
         staking.stake(20e18);
+        vm.expectEmit(true, true, false, false);
+        emit StakingLogic.Staked(alice, 30e18);
         staking.stake(30e18);
         vm.stopPrank();
         assertEq(staking.balances(alice), 60e18);
@@ -99,9 +115,17 @@ contract StakingLogicTest is Test {
 
     function test_StakeAndUnstakeMultiple() public {
         vm.startPrank(alice);
+        vm.expectEmit(true, true, false, false);
+        emit StakingLogic.Staked(alice, 100e18);
         staking.stake(100e18);
+        vm.expectEmit(true, true, false, false);
+        emit StakingLogic.Unstaked(alice, 40e18);
         staking.unstake(40e18);
+        vm.expectEmit(true, true, false, false);
+        emit StakingLogic.Staked(alice, 20e18);
         staking.stake(20e18);
+        vm.expectEmit(true, true, false, false);
+        emit StakingLogic.Unstaked(alice, 80e18);
         staking.unstake(80e18);
         vm.stopPrank();
         assertEq(staking.balances(alice), 0);
