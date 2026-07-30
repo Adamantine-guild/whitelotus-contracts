@@ -12,16 +12,16 @@ import {
 } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {
     PausableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
-    ReentrancyGuardUpgradeable
-} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+    ReentrancyGuard
+} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
-import {MathUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IStrategy} from "../interfaces/IStrategy.sol";
 
 /// @title WhiteLotusERC4626 - Tokenized vault routing capital across pluggable yield strategies
@@ -41,7 +41,7 @@ contract WhiteLotusERC4626 is
     ERC4626Upgradeable,
     AccessControlUpgradeable,
     PausableUpgradeable,
-    ReentrancyGuardUpgradeable,
+    ReentrancyGuard,
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
@@ -110,7 +110,7 @@ contract WhiteLotusERC4626 is
         if (governance_ == address(0)) revert ZeroAddress();
 
         __ERC20_init(name_, symbol_);
-        __ERC4626_init(IERC20Upgradeable(address(asset_)));
+        __ERC4626_init(IERC20(address(asset_)));
         __AccessControl_init();
         __Pausable_init();
         __ReentrancyGuard_init();
@@ -201,7 +201,7 @@ contract WhiteLotusERC4626 is
     }
 
     function maxRedeem(address owner) public view override returns (uint256) {
-        uint256 redeemable = _convertToShares(liquidAssets(), MathUpgradeable.Rounding.Down);
+        uint256 redeemable = _convertToShares(liquidAssets(), Math.Rounding.Down);
         return Math.min(super.maxRedeem(owner), redeemable);
     }
 
