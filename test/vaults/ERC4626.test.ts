@@ -826,12 +826,26 @@ describe("WhiteLotusERC4626", function () {
       ).to.be.revertedWithCustomError(vault, "EnforcedPause");
     });
 
-    it("keeps withdrawals open", async function () {
+    it("closes withdrawals and redemptions and reports a zero ceiling", async function () {
+      expect(await vault.maxWithdraw(await alice.getAddress())).to.equal(0);
+      expect(await vault.maxRedeem(await alice.getAddress())).to.equal(0);
+      await expect(
+        vault
+          .connect(alice)
+          .withdraw(500n * WAD, await alice.getAddress(), await alice.getAddress())
+      ).to.be.revertedWithCustomError(vault, "EnforcedPause");
+      await expect(
+        vault
+          .connect(alice)
+          .redeem(500n * WAD, await alice.getAddress(), await alice.getAddress())
+      ).to.be.revertedWithCustomError(vault, "EnforcedPause");
+    });
+    it("reopens withdrawals after unpause", async function () {
+      await vault.unpause();
       const before = await asset.balanceOf(await alice.getAddress());
       await vault
         .connect(alice)
         .withdraw(500n * WAD, await alice.getAddress(), await alice.getAddress());
-
       expect((await asset.balanceOf(await alice.getAddress())) - before).to.equal(500n * WAD);
     });
 

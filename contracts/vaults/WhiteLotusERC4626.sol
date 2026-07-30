@@ -167,19 +167,22 @@ contract WhiteLotusERC4626 is
         return super.mint(shares, receiver);
     }
 
-    /// @dev Withdrawals stay open while paused so a halt can never trap depositors.
+    /// @dev Reverts while the vault is paused, per the emergency circuit-breaker requirement.
     function withdraw(uint256 assets, address receiver, address owner)
         public
         override
+        whenNotPaused
         nonReentrant
         returns (uint256)
     {
         return super.withdraw(assets, receiver, owner);
     }
 
+    /// @dev Reverts while the vault is paused, per the emergency circuit-breaker requirement.
     function redeem(uint256 shares, address receiver, address owner)
         public
         override
+        whenNotPaused
         nonReentrant
         returns (uint256)
     {
@@ -197,10 +200,12 @@ contract WhiteLotusERC4626 is
     /// @dev Capped by what the strategies can actually release, so a quote is never a promise the
     ///      vault cannot keep in the same block.
     function maxWithdraw(address owner) public view override returns (uint256) {
+        if (paused()) return 0;
         return Math.min(super.maxWithdraw(owner), liquidAssets());
     }
 
     function maxRedeem(address owner) public view override returns (uint256) {
+        if (paused()) return 0;
         uint256 redeemable = _convertToShares(liquidAssets(), MathUpgradeable.Rounding.Down);
         return Math.min(super.maxRedeem(owner), redeemable);
     }
