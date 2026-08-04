@@ -5,8 +5,9 @@ import {BaseLogic} from "./BaseLogic.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 /// @title StakingLogic - Core staking with an emergency circuit breaker
-/// @notice Upgradeable staking ledger. An owner-controlled pause halts new stakes
-///         while leaving unstakes open, so a halt can never trap user funds.
+/// @notice Upgradeable staking ledger. An owner-controlled pause halts both
+///         stakes and unstakes, matching the WhiteLotusERC4626 circuit-breaker
+///         precedent (PR #148) so an emergency halt freezes the whole surface.
 contract StakingLogic is BaseLogic, PausableUpgradeable {
     uint256 public totalStaked;
     mapping(address => uint256) public balances;
@@ -43,10 +44,9 @@ contract StakingLogic is BaseLogic, PausableUpgradeable {
     }
 
     /// @notice Withdraw staked tokens.
-    /// @dev Intentionally NOT gated by {whenNotPaused}: users can always exit.
-    ///      Blocking unstake while paused would trap depositor funds, the exact
-    ///      failure mode a circuit breaker exists to prevent (matches Vault.sol).
-    function unstake(uint256 amount) external {
+    /// @dev Reverts while paused, matching the emergency circuit-breaker
+    ///      requirement and the WhiteLotusERC4626 withdraw/redeem precedent.
+    function unstake(uint256 amount) external whenNotPaused {
         if (amount == 0) revert ZeroAmount();
         uint256 staked = balances[msg.sender];
         if (staked < amount) revert InsufficientStake(staked, amount);
@@ -57,7 +57,7 @@ contract StakingLogic is BaseLogic, PausableUpgradeable {
         emit Unstaked(msg.sender, amount);
     }
 
-    /// @notice Emergency pause. Halts new stakes; unstakes stay available.
+    /// @notice Emergency pause. Halts stakes and unstakes.
     /// @dev Restricted to the owner. Emits the standard {Paused} event.
     function pause() external onlyOwner {
         _pause();
