@@ -3,11 +3,13 @@ pragma solidity ^0.8.24;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 
 /// @title BaseLogic - Base contract for all upgradeable logic contracts
 /// @notice Implements the __gap pattern to prevent storage collisions during upgrades.
-abstract contract BaseLogic is Initializable, UUPSUpgradeable, OwnableUpgradeable {
+/// @dev Ownership uses the two-step Ownable2StepUpgradeable pattern so a typo in the
+///      pending owner address can never permanently lock the contract.
+abstract contract BaseLogic is Initializable, UUPSUpgradeable, Ownable2StepUpgradeable {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();

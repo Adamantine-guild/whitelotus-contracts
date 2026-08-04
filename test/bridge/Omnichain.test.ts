@@ -136,6 +136,9 @@ describe("OmnichainReceiver", function () {
         testReceiver = await Receiver.deploy(await mockEndpoint.getAddress());
         await testReceiver.waitForDeployment();
         await testReceiver.transferOwnership(user.address);
+        // Two-step ownership (issue #139): the new owner must acceptOwnership()
+        // before the transfer finalizes.
+        await testReceiver.connect(user).acceptOwnership();
     }
     await testReceiver.waitForDeployment();
     expect(await testReceiver.owner()).to.equal(user.address);

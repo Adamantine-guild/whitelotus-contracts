@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable2Step} from "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 
 /// @title TWAP - Time-Weighted Average Price Oracle
 /// @notice Manipulation-resistant on-chain price oracle derived from AMM pair observations.
@@ -30,7 +30,7 @@ import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 ///      - `setConfig()` and `setAuthorized()` are owner-only.
 ///      - If no observation is old enough for the requested window, the query reverts
 ///        rather than silently falling back to a shorter (more manipulable) window.
-contract TWAP is Ownable {
+contract TWAP is Ownable2Step {
     // ═══════════════════════════════════════════════════════════════════════════
     //  Types
     // ═══════════════════════════════════════════════════════════════════════════
@@ -145,7 +145,7 @@ contract TWAP is Ownable {
     /// @param _minUpdateInterval Minimum seconds between consecutive observation writes.
     /// @param _defaultWindow     Default TWAP lookback window in seconds (e.g., 1800 for 30 min).
     /// @param _owner             Address that can manage config and authorizations.
-    constructor(uint32 _minUpdateInterval, uint32 _defaultWindow, address _owner) Ownable() {
+    constructor(uint32 _minUpdateInterval, uint32 _defaultWindow, address _owner) Ownable2Step() {
         if (_owner != msg.sender) _transferOwnership(_owner);
         require(_minUpdateInterval > 0, "TWAP: zero min update interval");
         require(_defaultWindow >= _minUpdateInterval, "TWAP: window < interval");

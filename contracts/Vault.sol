@@ -6,7 +6,7 @@ import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from
     "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable2Step} from "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -57,7 +57,7 @@ import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 ///      │  This asymmetry matches DeFi convention: users can always exit.      │
 ///      └───────────────────────────────────────────────────────────────────────┘
 
-contract Vault is ERC4626, Ownable, Pausable, ReentrancyGuard {
+contract Vault is ERC4626, Ownable2Step, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -107,7 +107,7 @@ contract Vault is ERC4626, Ownable, Pausable, ReentrancyGuard {
     constructor(IERC20 asset_, string memory name_, string memory symbol_, address owner_)
         ERC4626(asset_)
         ERC20(name_, symbol_)
-        Ownable()
+        Ownable2Step()
     {
         if (owner_ != msg.sender) _transferOwnership(owner_);
         // ── Dead-share seeding ───────────────────────────────────────────────
