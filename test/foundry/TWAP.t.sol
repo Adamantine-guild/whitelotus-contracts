@@ -322,8 +322,9 @@ contract TWAPTest is Test {
         _update(token0, token1, PRECISION, PRECISION);
 
         bytes32 pairId = keccak256(abi.encodePacked(token0, token1));
+        // Index 5 requires 6 observations; only the seed exists -> available=1, required=6.
         vm.expectRevert(
-            abi.encodeWithSelector(TWAP.InsufficientObservations.selector, pairId, 1, 2)
+            abi.encodeWithSelector(TWAP.InsufficientObservations.selector, pairId, 1, 6)
         );
         twap.getObservation(token0, token1, 5);
     }
@@ -421,6 +422,9 @@ contract TWAPTest is Test {
     function testConsultRevertsWindowTooLarge() public {
         uint256 price = PRECISION;
 
+        // Start at a round timestamp so the built history is exactly 15 minutes:
+        // 1 seed + 29 writes at 30s intervals = 900s of history.
+        vm.warp(1000);
         _update(token0, token1, price, price);
         // Build only ~15 minutes of history
         for (uint256 i = 0; i < 30; i++) {
