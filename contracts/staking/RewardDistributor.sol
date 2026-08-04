@@ -335,39 +335,4 @@ contract RewardDistributor is Ownable, ReentrancyGuard {
         emit Claimed(account, totalClaimed);
     }
 
-    /// @notice Claim rewards in batch for multiple token IDs / accounts.
-    /// @param tokenIds Array of token IDs or staking identifiers to claim rewards for.
-    /// @return totalClaimed The total amount of reward tokens disbursed to the caller.
-    function batchClaimRewards(uint256[] calldata tokenIds) external nonReentrant returns (uint256 totalClaimed) {
-        uint256 len = tokenIds.length;
-        if (len == 0) revert ZeroAmount();
-
-        updatePool();
-
-        address account = msg.sender;
-        IERC20 token = rewardToken;
-
-        for (uint256 i = 0; i < len; ) {
-            UserInfo storage user = userInfo[account];
-
-            _settle(user);
-            _writeRewardDebt(user);
-
-            uint256 amount = user.accrued;
-            if (amount > 0) {
-                user.accrued = 0;
-                totalClaimed += amount;
-            }
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        if (totalClaimed == 0) revert NothingToClaim();
-
-        token.safeTransfer(account, totalClaimed);
-        emit Claimed(account, totalClaimed);
-    }
-
 }
