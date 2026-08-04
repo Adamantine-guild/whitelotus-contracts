@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 
-import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable2Step} from "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 
 interface ILayerZeroEndpointV2 {
     struct Origin {
@@ -40,7 +40,7 @@ interface ILayerZeroReceiver {
     ) external payable;
 }
 
-abstract contract LZAdapter is Ownable, ILayerZeroReceiver {
+abstract contract LZAdapter is Ownable2Step, ILayerZeroReceiver {
     error ZeroEndpoint();
     error ZeroPeer();
     error ZeroGasLimit();
@@ -71,7 +71,7 @@ abstract contract LZAdapter is Ownable, ILayerZeroReceiver {
     mapping(bytes32 guid => bool processed) public processedGuid;
     mapping(uint32 eid => address executor) public remoteExecutors;
 
-    constructor(address endpoint_, address owner_) Ownable() {
+    constructor(address endpoint_, address owner_) Ownable2Step() {
         if (owner_ != msg.sender) _transferOwnership(owner_);
         if (!(endpoint_ != address(0))) revert ZeroEndpoint();
         endpoint = ILayerZeroEndpointV2(endpoint_);

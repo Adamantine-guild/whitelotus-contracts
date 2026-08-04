@@ -5,13 +5,13 @@ import {ERC4626} from "openzeppelin-contracts/contracts/token/ERC20/extensions/E
 import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable2Step} from "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 import {IERC3156FlashBorrower} from "../interfaces/IERC3156FlashBorrower.sol";
 import {IERC3156FlashLender} from "../interfaces/IERC3156FlashLender.sol";
 
-contract FlashLender is ERC4626, Ownable, ReentrancyGuard, IERC3156FlashLender {
+contract FlashLender is ERC4626, Ownable2Step, ReentrancyGuard, IERC3156FlashLender {
     using SafeERC20 for IERC20;
 
     uint256 public constant BPS_DENOMINATOR = 10_000;
@@ -38,7 +38,7 @@ contract FlashLender is ERC4626, Ownable, ReentrancyGuard, IERC3156FlashLender {
         string memory symbol_,
         address governance_,
         uint256 initialFeeBps
-    ) ERC4626(asset_) ERC20(name_, symbol_) Ownable() {
+    ) ERC4626(asset_) ERC20(name_, symbol_) Ownable2Step() {
         if (governance_ != msg.sender) _transferOwnership(governance_);
         _setFee(initialFeeBps);
     }

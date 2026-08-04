@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable2Step} from "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 
 interface AggregatorV3Interface {
     function decimals() external view returns (uint8);
@@ -31,7 +31,7 @@ interface IMintableERC20 is IERC20 {
  * @notice Multi-Collateral Debt Position Engine allowing users to deposit whitelisted collateral ERC20s,
  *         and borrow a stablecoin using dynamic parameters and normalized fixed-point 18-decimal math.
  */
-contract CDPEngine is Ownable {
+contract CDPEngine is Ownable2Step {
     error ZeroStablecoin();
     error ZeroToken();
     error InvalidMinimumCollateralRatio();
@@ -97,7 +97,7 @@ contract CDPEngine is Ownable {
 
     // ─── Constructor ────────────────────────────────────────────────────────
 
-    constructor(IMintableERC20 stablecoin_, address owner_) Ownable() {
+    constructor(IMintableERC20 stablecoin_, address owner_) Ownable2Step() {
         if (owner_ != msg.sender) _transferOwnership(owner_);
         if (!(address(stablecoin_) != address(0))) revert ZeroStablecoin();
         stablecoin = stablecoin_;

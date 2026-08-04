@@ -5,7 +5,7 @@ import {ERC721} from "openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
 import {
     ERC721Enumerable
 } from "openzeppelin-contracts/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable2Step} from "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 
 /**
  * @title WhitechainNFT
@@ -43,12 +43,12 @@ import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
  * indexing (e.g., via The Graph or an indexer) should prefer bare ERC721 to
  * save gas on every transfer.
  */
-contract WhitechainNFT is ERC721, ERC721Enumerable, Ownable {
+contract WhitechainNFT is ERC721, ERC721Enumerable, Ownable2Step {
     uint256 private _nextTokenId;
 
     constructor(string memory name_, string memory symbol_, address owner_)
         ERC721(name_, symbol_)
-        Ownable()
+        Ownable2Step()
     {
         if (owner_ != msg.sender) _transferOwnership(owner_);
     }

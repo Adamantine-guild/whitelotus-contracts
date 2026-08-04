@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable2Step} from "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 import {LogPriceMath} from "../libraries/LogPriceMath.sol";
 
 /// @title TWAPOracle - Manipulation-resistant time-weighted average price oracle
@@ -16,7 +16,7 @@ import {LogPriceMath} from "../libraries/LogPriceMath.sol";
 ///      Queries interpolate between the two checkpoints surrounding the requested timestamp and
 ///      revert rather than degrade when the ring buffer cannot cover the window or when the data
 ///      around the target is too sparse to interpolate meaningfully.
-contract TWAPOracle is Ownable {
+contract TWAPOracle is Ownable2Step {
     /// @notice A cumulative log-price checkpoint.
     /// @param blockTimestamp      Timestamp at which the checkpoint was taken.
     /// @param logPriceCumulative  Running sum of `log2(price) * secondsElapsed` in Q64.64.
@@ -85,7 +85,7 @@ contract TWAPOracle is Ownable {
     /// @param _targetWindow      Lookback window the buffer should be able to serve, in seconds.
     /// @param _maxObservationGap Longest tolerated gap between consecutive checkpoints, in seconds.
     /// @param owner_             Address allowed to register pools and update configuration.
-    constructor(uint32 _targetWindow, uint32 _maxObservationGap, address owner_) Ownable() {
+    constructor(uint32 _targetWindow, uint32 _maxObservationGap, address owner_) Ownable2Step() {
         if (owner_ != msg.sender) _transferOwnership(owner_);
         _setConfig(_targetWindow, _maxObservationGap);
     }
