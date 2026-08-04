@@ -7,12 +7,15 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 
 contract StakingLogicTest is Test {
     StakingLogic internal staking;
+    address internal owner = address(0x0A11CE);
     address internal alice = address(0xB0B);
     address internal bob = address(0xCA11);
 
     function setUp() public {
         StakingLogic impl = new StakingLogic();
-        bytes memory initData = abi.encodeWithSelector(StakingLogic.initialize.selector, address(this));
+        // Owner must differ from the initializing caller (msg.sender) or initialize
+        // reverts with AlreadyInitialOwner. Use a distinct EOA so the suite runs.
+        bytes memory initData = abi.encodeWithSelector(StakingLogic.initialize.selector, owner);
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         staking = StakingLogic(address(proxy));
     }
