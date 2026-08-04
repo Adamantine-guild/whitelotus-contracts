@@ -12,15 +12,15 @@ import {
 } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {
     PausableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {
-    ReentrancyGuard
-} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {MathUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
+import {IERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IStrategy} from "../interfaces/IStrategy.sol";
 
@@ -41,7 +41,7 @@ contract WhiteLotusERC4626 is
     ERC4626Upgradeable,
     AccessControlUpgradeable,
     PausableUpgradeable,
-    ReentrancyGuard,
+    ReentrancyGuardUpgradeable,
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
@@ -102,7 +102,7 @@ contract WhiteLotusERC4626 is
     /// @param symbol_               Symbol of the share token.
     /// @param governance_           Receives the admin, governor and keeper roles.
     function initialize(
-        IERC20 asset_,
+        IERC20Upgradeable asset_,
         string memory name_,
         string memory symbol_,
         address governance_
@@ -110,7 +110,7 @@ contract WhiteLotusERC4626 is
         if (governance_ == address(0)) revert ZeroAddress();
 
         __ERC20_init(name_, symbol_);
-        __ERC4626_init(IERC20(address(asset_)));
+        __ERC4626_init(asset_);
         __AccessControl_init();
         __Pausable_init();
         __ReentrancyGuard_init();
