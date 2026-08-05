@@ -53,6 +53,10 @@ contract WhiteLotusERC4626 is
     /// @notice Runs the routine harvest and rebalance cycle.
     bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
 
+    /// @notice Distinct guardian role (#90): can freeze deposits instantly without
+    ///         any governor/admin powers. Unpausing stays with the governor.
+    bytes32 public constant PAUSER_GUARDIAN_ROLE = keccak256("PAUSER_GUARDIAN_ROLE");
+
     uint256 public constant MAX_BPS = 10_000;
 
     /// @notice Upper bound on registered strategies, since conversions iterate over all of them.
@@ -114,6 +118,10 @@ contract WhiteLotusERC4626 is
         __AccessControl_init();
         __Pausable_init();
         __ReentrancyGuard_init();
+
+        _grantRole(DEFAULT_ADMIN_ROLE, governance_);
+        _grantRole(GOVERNOR_ROLE, governance_);
+        _grantRole(KEEPER_ROLE, governance_);
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -302,7 +310,11 @@ contract WhiteLotusERC4626 is
     }
 
     /// @notice Halt deposits and mints. Withdrawals stay open.
-    function pause() external onlyRole(GOVERNOR_ROLE) {
+    /// @dev Callable by the governor OR the distinct pause guardian (#90).
+    function pause() external {
+        if (!(hasRole(GOVERNOR_ROLE, msg.sender) || hasRole(PAUSER_GUARDIAN_ROLE, msg.sender))) {
+            _checkRole(GOVERNOR_ROLE);
+        }
         _pause();
     }
 

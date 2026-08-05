@@ -12,14 +12,17 @@ interface IFlashloanReceiver {
 
 contract FlashloanFacet {
     error ExecutionFailed();
+    error RouterPaused();
 
     AppStorage internal s;
 
     event FlashloanExecuted(address indexed receiver, address token, uint256 amount, uint256 fee);
 
+    /// @dev Restricted while paused (#90) — flashloans are frozen during an emergency.
     function flashLoan(address receiver, address token, uint256 amount, bytes calldata data)
         external
     {
+        if (s.paused) revert RouterPaused();
         uint256 fee = amount / 1000; // 0.1% mock fee
 
         // Callback to receiver

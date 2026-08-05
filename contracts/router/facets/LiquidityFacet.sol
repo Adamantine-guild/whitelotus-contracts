@@ -6,6 +6,7 @@ import {AppStorage} from "../../libraries/AppStorage.sol";
 
 contract LiquidityFacet {
     error InsufficientLiquidityBalance();
+    error RouterPaused();
 
     AppStorage internal s;
 
@@ -26,10 +27,12 @@ contract LiquidityFacet {
         uint256 amountB
     );
 
+    /// @dev Restricted while paused (#90) — new liquidity entry is frozen in an emergency.
     function addLiquidity(address tokenA, address tokenB, uint256 amountA, uint256 amountB)
         external
         returns (uint256 liquidity)
     {
+        if (s.paused) revert RouterPaused();
         // Simple mock liquidity addition
         liquidity = amountA + amountB;
         s.balances[msg.sender] += liquidity;
