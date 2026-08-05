@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {PauserModule} from "../security/PauserModule.sol";
 
 interface AggregatorV3Interface {
     function decimals() external view returns (uint8);
@@ -31,7 +31,8 @@ interface IMintableERC20 is IERC20 {
  * @notice Multi-Collateral Debt Position Engine allowing users to deposit whitelisted collateral ERC20s,
  *         and borrow a stablecoin using dynamic parameters and normalized fixed-point 18-decimal math.
  */
-contract CDPEngine is Ownable {
+/// @custom:oz-upgrades-unsafe-allow constructor
+contract CDPEngine is PauserModule {
     error ZeroStablecoin();
     error ZeroToken();
     error InvalidMinimumCollateralRatio();
@@ -97,7 +98,12 @@ contract CDPEngine is Ownable {
 
     // ─── Constructor ────────────────────────────────────────────────────────
 
-    constructor(IMintableERC20 stablecoin_, address owner_) Ownable() {
+    /// @param stablecoin_ The stablecoin minted on borrow.
+    /// @param owner_      Admin owner (can whitelist collateral, set feeds, guardians).
+    /// @param timelock_   Multi-sig governance timelock — the ONLY address that may unpause.
+    constructor(IMintableERC20 stablecoin_, address owner_, address timelock_)
+        PauserModule(timelock_)
+    {
         if (owner_ != msg.sender) _transferOwnership(owner_);
         if (!(address(stablecoin_) != address(0))) revert ZeroStablecoin();
         stablecoin = stablecoin_;
@@ -139,7 +145,8 @@ contract CDPEngine is Ownable {
 
     // ─── Collateral Operations ──────────────────────────────────────────────
 
-    function depositCollateral(address collateralType, uint256 amount) external {
+    /// @dev Restricted while paused (#90) — new capital entry is frozen in an emergency.
+    function depositCollateral(address collateralType, uint256 amount) external whenNotPaused {
         if (!(collateralConfigs[collateralType].whitelisted)) revert CollateralNotWhitelisted();
         if (!(amount > 0)) revert ZeroAmount();
 
@@ -169,7 +176,8 @@ contract CDPEngine is Ownable {
 
     // ─── Debt Operations ────────────────────────────────────────────────────
 
-    function borrow(address collateralType, uint256 amount) external {
+    /// @dev Restricted while paused (#90) — borrowing new debt is frozen in an emergency.
+    function borrow(address collateralType, uint256 amount) external whenNotPaused {
         if (!(collateralConfigs[collateralType].whitelisted)) revert CollateralNotWhitelisted();
         if (!(amount > 0)) revert ZeroAmount();
 

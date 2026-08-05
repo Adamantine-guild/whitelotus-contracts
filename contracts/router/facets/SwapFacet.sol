@@ -6,6 +6,7 @@ import {AppStorage} from "../../libraries/AppStorage.sol";
 
 contract SwapFacet {
     error InsufficientOutputAmount();
+    error RouterPaused();
 
     AppStorage internal s;
 
@@ -13,12 +14,14 @@ contract SwapFacet {
         address indexed user, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut
     );
 
+    /// @dev Restricted while paused (#90) — swaps are frozen during an emergency.
     function swapExactTokensForTokens(
         address tokenIn,
         address tokenOut,
         uint256 amountIn,
         uint256 minAmountOut
     ) external returns (uint256 amountOut) {
+        if (s.paused) revert RouterPaused();
         // Simple mock router logic
         amountOut = amountIn; // 1:1 mock swap
         if (!(amountOut >= minAmountOut)) revert InsufficientOutputAmount();

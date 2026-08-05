@@ -6,4 +6,8 @@ struct AppStorage {
     uint256 totalSwaps;
     uint256 totalLiquidityAdded;
     uint256 totalFlashLoans;
+    // ── Emergency circuit breaker (#90) ─────────────────────────────────────
+    bool paused;
+    address pauseGuardian;
+    address governanceTimelock;
 }

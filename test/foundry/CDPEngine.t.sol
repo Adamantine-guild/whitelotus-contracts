@@ -23,6 +23,7 @@ contract CDPEngineTest is Test {
     address internal admin = address(0x1111);
     address internal user = address(0x2222);
     address internal liquidatorUser = address(0x3333);
+    address internal timelock = address(0x4444);
 
     function setUp() public {
         // Deploy tokens
@@ -36,8 +37,8 @@ contract CDPEngineTest is Test {
         ethFeed = new MockAggregatorV3(8, 2000 * 10 ** 8); // $2k
         linkFeed = new MockAggregatorV3(18, 10 * 10 ** 18); // $10
 
-        // Deploy lending contracts
-        engine = new CDPEngine(IMintableERC20(address(stablecoin)), admin);
+        // Deploy lending contracts (timelock = separate multi-sig address)
+        engine = new CDPEngine(IMintableERC20(address(stablecoin)), admin, timelock);
         liquidator = new Liquidator(engine, stablecoin);
 
         // Admin whitelists collaterals and sets price feeds
