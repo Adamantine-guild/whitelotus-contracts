@@ -114,6 +114,10 @@ contract WhiteLotusERC4626 is
         __AccessControl_init();
         __Pausable_init();
         __ReentrancyGuard_init();
+
+        _grantRole(DEFAULT_ADMIN_ROLE, governance_);
+        _grantRole(GOVERNOR_ROLE, governance_);
+        _grantRole(KEEPER_ROLE, governance_);
     }
 
     /// @inheritdoc ERC4626Upgradeable
@@ -282,13 +286,17 @@ contract WhiteLotusERC4626 is
     }
 
     /// @notice Compound one strategy's yield and book the result against its principal.
-    function harvest(address strategy) external onlyRole(KEEPER_ROLE) {
+    /// @dev nonReentrant is applied outermost (#84): the guard must fire before the
+    ///      role check so a reentrant call from a malicious strategy is blocked even
+    ///      when the caller lacks the keeper role.
+    function harvest(address strategy) external nonReentrant onlyRole(KEEPER_ROLE) {
         _activeStrategy(strategy);
         _harvest(strategy);
     }
 
     /// @notice Compound every strategy and push the freed capital back out to target weights.
-    function harvestAll() external onlyRole(KEEPER_ROLE) {
+    /// @dev nonReentrant outermost (#84): harvestAll drives external strategy calls.
+    function harvestAll() external nonReentrant onlyRole(KEEPER_ROLE) {
         uint256 length = _strategies.length;
         for (uint256 i = 0; i < length; ++i) {
             _harvest(_strategies[i]);
@@ -297,7 +305,8 @@ contract WhiteLotusERC4626 is
     }
 
     /// @notice Move capital between the idle buffer and the strategies to match target weights.
-    function rebalance() external onlyRole(KEEPER_ROLE) {
+    /// @dev nonReentrant outermost (#84): rebalance moves capital via external calls.
+    function rebalance() external nonReentrant onlyRole(KEEPER_ROLE) {
         _rebalance();
     }
 
