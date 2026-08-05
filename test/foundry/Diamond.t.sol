@@ -40,6 +40,8 @@ contract DiamondTest is Test {
     address internal user = address(0x2222);
 
     function setUp() public {
+        vm.deal(user, 10 ether);
+
         // Deploy facets
         cutFacet = new DiamondCutFacet();
         loupeFacet = new DiamondLoupeFacet();
@@ -78,6 +80,16 @@ contract DiamondTest is Test {
         vm.prank(eoa);
         vm.expectRevert(DiamondCutFacet.EOAUpgradeNotAllowed.selector);
         IDiamondCut(address(diamond)).diamondCut(cut, address(0), "");
+    }
+
+    /// @notice Plain ETH sent to the Diamond is rejected instantly (#51):
+    ///         the diamond must not absorb stray native tokens.
+    function testDirectETHRejected() public {
+        vm.prank(user);
+        vm.expectRevert(Diamond.DirectETHNotAllowed.selector);
+        payable(address(diamond)).call{value: 1 ether}("");
+
+        assertEq(address(diamond).balance, 0);
     }
 
     /// @notice Ownership can still be transferred (transferOwnership has no EOA check).

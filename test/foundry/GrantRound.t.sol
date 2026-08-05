@@ -127,6 +127,44 @@ contract GrantRoundTest is Test {
         round.releasePayout(appId, 0);
     }
 
+    function testReceiveAcceptsFundingWhenActive() public {
+        vm.deal(stranger, 10 ether);
+        uint256 balanceBefore = address(round).balance;
+
+        vm.prank(stranger);
+        vm.expectEmit(true, true, true, true);
+        emit GrantRound.DepositReceived(stranger, 2 ether);
+        (bool ok,) = payable(address(round)).call{value: 2 ether}("");
+        assertTrue(ok, "transfer must succeed while unpaused");
+
+        assertEq(address(round).balance, balanceBefore + 2 ether);
+    }
+
+    function testReceiveRejectsFundingWhenPaused() public {
+        vm.prank(admin);
+        round.pause();
+
+        // Plain native token transfer must revert while paused — the documented
+        // "fund-in operations revert" guarantee (#1) now covers receive() too.
+        vm.prank(stranger);
+        vm.expectRevert(GrantRound.ContractPaused.selector);
+        payable(address(round)).call{value: 1 ether}("");
+
+        // Balance unchanged — no funds absorbed during pause.
+        assertEq(address(round).balance, 5 ether);
+    }
+
+    function testReceiveRespectsPauseForEveryoneIncludingAdmin() public {
+        vm.prank(admin);
+        round.pause();
+
+        // Even the admin's plain transfer is rejected while paused (deposit()
+        // already enforced this; receive() now matches).
+        vm.prank(admin);
+        vm.expectRevert(GrantRound.ContractPaused.selector);
+        payable(address(round)).call{value: 1 ether}("");
+    }
+
     function testClawbackUnspentFunds() public {
         vm.prank(grantee);
         uint256 appId = round.submitApplication("ipfs://app1");
