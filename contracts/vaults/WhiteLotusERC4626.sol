@@ -8,16 +8,22 @@ import {
     ERC20Upgradeable
 } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {
+    IERC20Upgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import {
+    MathUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/math/MathUpgradeable.sol";
+import {
     AccessControlUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {
     PausableUpgradeable
-} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+} from "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
-    ReentrancyGuard
-} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
@@ -41,7 +47,7 @@ contract WhiteLotusERC4626 is
     ERC4626Upgradeable,
     AccessControlUpgradeable,
     PausableUpgradeable,
-    ReentrancyGuard,
+    ReentrancyGuardUpgradeable,
     UUPSUpgradeable
 {
     using SafeERC20 for IERC20;
@@ -110,7 +116,7 @@ contract WhiteLotusERC4626 is
         if (governance_ == address(0)) revert ZeroAddress();
 
         __ERC20_init(name_, symbol_);
-        __ERC4626_init(IERC20(address(asset_)));
+        __ERC4626_init(IERC20Upgradeable(address(asset_)));
         __AccessControl_init();
         __Pausable_init();
         __ReentrancyGuard_init();
