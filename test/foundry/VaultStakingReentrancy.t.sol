@@ -106,12 +106,10 @@ contract VaultStakingReentrancyTest is Test {
         // being fixed elsewhere per PR #157's own description) where it never grants `governance_`
         // any role, including DEFAULT_ADMIN_ROLE — so grantRole() has no caller who could use it.
         // Force the roles directly via storage so this suite can exercise the guarded functions.
-        stdstore.target(address(vault)).sig("hasRole(bytes32,address)").with_key(
-            vault.GOVERNOR_ROLE()
-        ).with_key(governor).checked_write(true);
-        stdstore.target(address(vault)).sig("hasRole(bytes32,address)").with_key(
-            vault.KEEPER_ROLE()
-        ).with_key(keeper).checked_write(true);
+        stdstore.target(address(vault)).sig("hasRole(bytes32,address)")
+            .with_key(vault.GOVERNOR_ROLE()).with_key(governor).checked_write(true);
+        stdstore.target(address(vault)).sig("hasRole(bytes32,address)")
+            .with_key(vault.KEEPER_ROLE()).with_key(keeper).checked_write(true);
 
         strategy = new MaliciousStrategy(IERC20(address(asset)), address(vault));
         vm.prank(governor);
