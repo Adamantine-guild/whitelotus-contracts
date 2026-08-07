@@ -2,8 +2,11 @@
 pragma solidity ^0.8.24;
 
 import {BaseLogic} from "./BaseLogic.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
-contract StakingLogic is BaseLogic {
+contract StakingLogic is BaseLogic, ReentrancyGuardUpgradeable {
     uint256 public totalStaked;
     mapping(address => uint256) public balances;
 
@@ -22,19 +25,23 @@ contract StakingLogic is BaseLogic {
 
     function initialize(address initialOwner) initializer public {
         __Ownable_init();
+        __ReentrancyGuard_init();
         if (initialOwner == address(0)) revert ZeroAddress();
         if (initialOwner == msg.sender) revert AlreadyInitialOwner();
         _transferOwnership(initialOwner);
     }
 
-    function stake(uint256 amount) external {
+    /// @dev nonReentrant: no external call exists on this path today, but stake/unstake
+    ///      mutate global accounting state and are guarded defensively against any
+    ///      future external call (e.g. a reward-token transfer) introduced on this path.
+    function stake(uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
         totalStaked += amount;
         balances[msg.sender] += amount;
         emit Staked(msg.sender, amount);
     }
 
-    function unstake(uint256 amount) external {
+    function unstake(uint256 amount) external nonReentrant {
         if (amount == 0) revert ZeroAmount();
         uint256 staked = balances[msg.sender];
         if (staked < amount) revert InsufficientStake(staked, amount);

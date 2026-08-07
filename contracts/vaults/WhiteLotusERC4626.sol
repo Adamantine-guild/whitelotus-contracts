@@ -288,13 +288,16 @@ contract WhiteLotusERC4626 is
     }
 
     /// @notice Compound one strategy's yield and book the result against its principal.
-    function harvest(address strategy) external onlyRole(KEEPER_ROLE) {
+    /// @dev nonReentrant: {_harvest} calls out to the strategy before the resulting
+    ///      principal update settles, so a malicious strategy could otherwise reenter here.
+    function harvest(address strategy) external nonReentrant onlyRole(KEEPER_ROLE) {
         _activeStrategy(strategy);
         _harvest(strategy);
     }
 
     /// @notice Compound every strategy and push the freed capital back out to target weights.
-    function harvestAll() external onlyRole(KEEPER_ROLE) {
+    /// @dev nonReentrant: drives the same external strategy calls as {harvest} and {rebalance}.
+    function harvestAll() external nonReentrant onlyRole(KEEPER_ROLE) {
         uint256 length = _strategies.length;
         for (uint256 i = 0; i < length; ++i) {
             _harvest(_strategies[i]);
@@ -303,7 +306,9 @@ contract WhiteLotusERC4626 is
     }
 
     /// @notice Move capital between the idle buffer and the strategies to match target weights.
-    function rebalance() external onlyRole(KEEPER_ROLE) {
+    /// @dev nonReentrant: {_rebalance} moves capital via external strategy calls before
+    ///      the vault's own accounting is fully settled.
+    function rebalance() external nonReentrant onlyRole(KEEPER_ROLE) {
         _rebalance();
     }
 
