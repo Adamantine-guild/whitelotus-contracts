@@ -150,8 +150,10 @@ contract GrantRound is ERC2771Context {
         admin = _admin;
     }
 
-    /// @notice Accept ETH funding for this round
-    receive() external payable {
+    /// @notice Accept ETH funding for this round.
+    /// @dev Respects the pause switch so the documented "fund-in operations revert"
+    ///      guarantee (#1) holds for every funding path, not just deposit().
+    receive() external payable whenNotPaused {
         emit DepositReceived(msg.sender, msg.value);
     }
 
