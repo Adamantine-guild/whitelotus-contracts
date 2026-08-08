@@ -6,7 +6,7 @@ import {ERC20} from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from
     "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable2Step} from "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 import {Pausable} from "openzeppelin-contracts/contracts/security/Pausable.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -57,7 +57,7 @@ import {Math} from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 ///      │  This asymmetry matches DeFi convention: users can always exit.      │
 ///      └───────────────────────────────────────────────────────────────────────┘
 
-contract Vault is ERC4626, Ownable, Pausable, ReentrancyGuard {
+contract Vault is ERC4626, Ownable2Step, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -107,7 +107,7 @@ contract Vault is ERC4626, Ownable, Pausable, ReentrancyGuard {
     constructor(IERC20 asset_, string memory name_, string memory symbol_, address owner_)
         ERC4626(asset_)
         ERC20(name_, symbol_)
-        Ownable()
+        Ownable2Step()
     {
         if (owner_ != msg.sender) _transferOwnership(owner_);
         // ── Dead-share seeding ───────────────────────────────────────────────
@@ -123,6 +123,14 @@ contract Vault is ERC4626, Ownable, Pausable, ReentrancyGuard {
         // impact on honest depositors is negligible.
         _mint(address(1), DEAD_SHARES);
         emit DeadSharesMinted(address(1), DEAD_SHARES);
+    }
+
+    /// @notice Shares carry a 18-decimal virtual offset (share decimals = asset decimals + 18).
+    ///         This activates OpenZeppelin's virtual-shares/virtual-assets inflation defense
+    ///         (see ERC4626._decimalsOffset), matching the documented scheme the test suite
+    ///         asserts (decimals() == 36, ≤0.01% loss under inflation/donation attacks).
+    function _decimalsOffset() internal view virtual override returns (uint8) {
+        return 18;
     }
 
     // ─── EIP-4626 Core Overrides ────────────────────────────────────────────
