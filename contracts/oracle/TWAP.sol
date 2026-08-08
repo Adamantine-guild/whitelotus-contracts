@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {Ownable2Step} from "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 
 /// @title TWAP - Time-Weighted Average Price Oracle
 /// @notice Manipulation-resistant on-chain price oracle derived from AMM pair observations.
@@ -30,7 +30,7 @@ import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 ///      - `setConfig()` and `setAuthorized()` are owner-only.
 ///      - If no observation is old enough for the requested window, the query reverts
 ///        rather than silently falling back to a shorter (more manipulable) window.
-contract TWAP is Ownable {
+contract TWAP is Ownable2Step {
     // ═══════════════════════════════════════════════════════════════════════════
     //  Types
     // ═══════════════════════════════════════════════════════════════════════════
@@ -63,7 +63,9 @@ contract TWAP is Ownable {
         uint32 lastUpdateTime;
         uint16 index;
         uint16 cardinality;
-        // slot 2+
+        // slot 2
+        uint256 lastPrice;
+        // slot 3+
         Observation[256] observations;
     }
 
@@ -145,7 +147,7 @@ contract TWAP is Ownable {
     /// @param _minUpdateInterval Minimum seconds between consecutive observation writes.
     /// @param _defaultWindow     Default TWAP lookback window in seconds (e.g., 1800 for 30 min).
     /// @param _owner             Address that can manage config and authorizations.
-    constructor(uint32 _minUpdateInterval, uint32 _defaultWindow, address _owner) Ownable() {
+    constructor(uint32 _minUpdateInterval, uint32 _defaultWindow, address _owner) Ownable2Step() {
         if (_owner != msg.sender) _transferOwnership(_owner);
         require(_minUpdateInterval > 0, "TWAP: zero min update interval");
         require(_defaultWindow >= _minUpdateInterval, "TWAP: window < interval");
@@ -195,6 +197,10 @@ contract TWAP is Ownable {
         if (price == 0 || priceInv == 0) revert InvalidPrice();
         bytes32 pairId = _pairId(token0, token1);
         PairState storage pair = pairs[pairId];
+
+        // Track the latest spot price so consult() can extend the cumulative
+        // price to the current timestamp even when the pair has gone stale.
+        pair.lastPrice = price;
 
         // ── Initialize the buffer on first call ───────────────────────────
         if (pair.lastUpdateTime == 0) {
@@ -289,7 +295,13 @@ contract TWAP is Ownable {
         view
         returns (uint256 priceAverage)
     {
-        uint32 targetTimestamp = uint32(block.timestamp) - window;
+        uint32 nowTs = uint32(block.timestamp);
+
+        // Clamp the search target to 0 when the requested window exceeds the history
+        // available on-chain (e.g. block.timestamp < window). This avoids the uint32
+        // arithmetic underflow that previously produced a bare panic instead of the
+        // documented InsufficientWindow revert.
+        uint32 targetTimestamp = window >= nowTs ? 0 : nowTs - window;
 
         // Find the observation at or just before targetTimestamp using binary search.
         (Observation memory oldestObs, bool found) = _binarySearch(pair, targetTimestamp);
@@ -298,17 +310,21 @@ contract TWAP is Ownable {
             // The oldest available observation (returned by _binarySearch) is newer than
             // targetTimestamp. Revert — silently falling back to a shorter window would
             // compromise manipulation resistance.
-            uint32 availableWindow = uint32(block.timestamp) - oldestObs.timestamp;
+            uint32 availableWindow = nowTs - oldestObs.timestamp;
             revert InsufficientWindow(pairId, availableWindow, window);
         }
 
-        // Use the continuously-tracked cumulative price as the "newest" value.
-        // This includes all price data accumulated since the last observation,
-        // matching Uniswap V2 behavior.
-        uint32 timeDelta = uint32(block.timestamp) - oldestObs.timestamp;
+        // Extend the continuously-tracked cumulative price to the current moment using
+        // the last observed spot price. Without this, a pair that has not been updated
+        // recently would report a TWAP of zero (timestamp/cumulative mismatch) even
+        // though real price history exists — an oracle correctness bug.
+        uint256 newestCumulative = pair.priceCumulativeLast
+            + pair.lastPrice * uint256(nowTs - pair.lastUpdateTime);
+
+        uint32 timeDelta = nowTs - oldestObs.timestamp;
         if (timeDelta == 0) revert InsufficientObservations(pairId, 0, 1);
 
-        uint256 cumulativeDelta = pair.priceCumulativeLast - oldestObs.priceCumulative;
+        uint256 cumulativeDelta = newestCumulative - oldestObs.priceCumulative;
         priceAverage = cumulativeDelta / timeDelta;
     }
 
