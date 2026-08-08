@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 import {IERC20} from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {ChainlinkOracle} from "../oracles/ChainlinkOracle.sol";
 
 interface AggregatorV3Interface {
     function decimals() external view returns (uint8);
@@ -48,6 +49,7 @@ contract CDPEngine is Ownable {
     error CoverExceedsDebt();
     error PriceFeedNotSet();
     error InvalidPrice();
+    error InvalidHeartbeat();
 
     using SafeERC20 for IERC20;
 
@@ -71,6 +73,12 @@ contract CDPEngine is Ownable {
     mapping(address => CollateralConfig) public collateralConfigs;
     mapping(address => address) public priceFeeds;
 
+    /// @notice Default maximum age (seconds) of a Chainlink update before it is considered stale.
+    uint256 public constant DEFAULT_HEARTBEAT = 3600;
+
+    /// @notice Per-asset maximum update age in seconds. Zero means the default heartbeat applies.
+    mapping(address => uint256) public heartbeats;
+
     // collateral => user => position
     mapping(address => mapping(address => Position)) public positions;
 
@@ -82,6 +90,7 @@ contract CDPEngine is Ownable {
         address indexed token, uint256 minCollateralRatio, uint256 liquidationPenalty
     );
     event PriceFeedSet(address indexed token, address indexed priceFeed);
+    event HeartbeatSet(address indexed token, uint256 heartbeat);
     event LiquidatorRoleSet(address indexed liquidator);
     event CollateralDeposited(address indexed collateralType, address indexed user, uint256 amount);
     event CollateralWithdrawn(address indexed collateralType, address indexed user, uint256 amount);
@@ -130,6 +139,22 @@ contract CDPEngine is Ownable {
 
         priceFeeds[token] = priceFeed;
         emit PriceFeedSet(token, priceFeed);
+    }
+
+    /// @notice Governance-adjustable staleness window per collateral asset (seconds).
+    /// @dev A heartbeat of zero is rejected; to reset an asset to the default, use {DEFAULT_HEARTBEAT}.
+    function setHeartbeat(address token, uint256 heartbeat) external onlyOwner {
+        if (!(token != address(0))) revert ZeroToken();
+        if (!(heartbeat != 0)) revert InvalidHeartbeat();
+
+        heartbeats[token] = heartbeat;
+        emit HeartbeatSet(token, heartbeat);
+    }
+
+    /// @notice Effective staleness window for `token` (per-asset override or default).
+    function getHeartbeat(address token) public view returns (uint256) {
+        uint256 heartbeat = heartbeats[token];
+        return heartbeat == 0 ? DEFAULT_HEARTBEAT : heartbeat;
     }
 
     function setLiquidatorRole(address _liquidator) external onlyOwner {
@@ -258,21 +283,14 @@ contract CDPEngine is Ownable {
         return collateralValue >= requiredCollateralValue;
     }
 
+    /// @notice Latest validated Chainlink price for `token`, normalized to 18 decimals.
+    /// @dev Reverts if the feed round is incomplete, the update is older than the asset's
+    ///      heartbeat window (stale/flatlined), or the price is not strictly positive.
     function getNormalizedPrice(address token) public view returns (uint256) {
         address feed = priceFeeds[token];
         if (!(feed != address(0))) revert PriceFeedNotSet();
 
-        (, int256 answer,,,) = AggregatorV3Interface(feed).latestRoundData();
-        if (!(answer > 0)) revert InvalidPrice();
-
-        uint8 decimals = AggregatorV3Interface(feed).decimals();
-        if (decimals == 18) {
-            return uint256(answer);
-        } else if (decimals < 18) {
-            return uint256(answer) * 10 ** (18 - decimals);
-        } else {
-            return uint256(answer) / 10 ** (decimals - 18);
-        }
+        return ChainlinkOracle.readPrice(feed, getHeartbeat(token));
     }
 
     function getNormalizedCollateralAmount(address token, uint256 amount)
